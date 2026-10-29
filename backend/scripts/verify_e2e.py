@@ -74,6 +74,7 @@ def main() -> int:
     out: dict = {"indication": args.indication, "assets": assets}
     t0 = time.time()
     with TestClient(app) as c:
+        audit0 = c.get("/api/v1/audit").json()  # the audit log persists in the cached aux DB; report this run only
         h = c.get("/api/v1/health").json()
         print(f"mednik {h['version']} · LLM: {h['llm_provider']} (enabled={h['llm_enabled']}, model={h['llm_model']})")
         print(f"Ingesting live data for {args.indication}: {', '.join(a['brand'] for a in assets)} … (first run takes several minutes)")
@@ -220,6 +221,7 @@ def main() -> int:
         out["guideline_status"] = {x["asset"]: x["status"]["status"] for x in g["assets"]}
         print("Guideline status:", json.dumps(out["guideline_status"], indent=1))
         audit = c.get("/api/v1/audit").json()
+        audit = {k: audit[k] - audit0.get(k, 0) for k in ("accepted", "rejected")}
         out["citation_audit"] = {"accepted": audit["accepted"], "rejected": audit["rejected"]}
         rep.check("Citation validator active", audit["accepted"] + audit["rejected"] > 0 or args.skip_literature,
                   f"{audit['accepted']} accepted / {audit['rejected']} rejected extractions", hard=False)
