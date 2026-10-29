@@ -38,6 +38,7 @@ def to_openapi_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 class GeminiProvider(LlmProvider):
     name = "gemini"
+    paced = True
     _thinking_ok = True
 
     @property

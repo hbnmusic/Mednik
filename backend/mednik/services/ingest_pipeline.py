@@ -208,6 +208,9 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
 
         summary["llm_usage"] = llm_base.usage_snapshot()
         u = summary["llm_usage"]
+        if u["daily_quota_exhausted"]:
+            say("Gemini's daily request limit was reached, so the remaining documents were skipped. Finished requests are cached: "
+                "run the sync again after midnight Pacific time (3 a.m. Eastern) and it will continue from there, or use a model with a higher limit.")
         if u["calls"] or u["cache_hits"] or u["failed"]:
             say(f"LLM usage: {u['calls']} requests sent ({u['cache_hits']} answered from cache), ~{u['approx_input_tokens']:,} input tokens, "
                 f"{u['rate_limited']} rate-limit waits, {u['failed']} extractions given up")

@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -24,6 +25,10 @@ class LlmError(RuntimeError):
     pass
 
 
+class DailyQuotaExhausted(LlmError):
+    """The provider's per-day request limit is used up; retrying today cannot succeed."""
+
+
 @dataclass
 class LlmUsage:
     """Counters for the current sync (reset when a sync starts), reported in the job summary."""
@@ -32,6 +37,7 @@ class LlmUsage:
     cache_hits: int = 0  # answered from the response cache, no quota used
     rate_limited: int = 0  # 429 / quota responses that were retried
     failed: int = 0  # extractions that gave up (their documents contribute nothing)
+    daily_quota_exhausted: bool = False  # once true, remaining calls in this sync are skipped immediately
     input_chars: int = 0
     prompt_tokens: int = 0  # as reported by the provider (0 if it does not report)
     output_tokens: int = 0  # includes reasoning tokens where the provider reports them
@@ -54,6 +60,13 @@ def usage_snapshot() -> dict[str, int]:
 _RETRY_DELAY_RE = re.compile(r'retryDelay"?\s*[:=]\s*"?(\d+(?:\.\d+)?)\s*s', re.I)
 
 
+_PER_DAY_RE = re.compile(r"per\s?day", re.I)
+
+
+def _is_daily_quota(msg: str) -> bool:
+    return _is_rate_limit(msg) and bool(_PER_DAY_RE.search(msg))
+
+
 def _is_rate_limit(msg: str) -> bool:
     low = msg.lower()
     return msg.startswith("429") or "resource_exhausted" in low or "quota" in low
@@ -73,13 +86,28 @@ class LlmProvider:
     def __init__(self, settings: Settings):
         self.settings = settings
         self._sem = asyncio.Semaphore(max(1, settings.llm_max_concurrency))
+        self._pace_lock = asyncio.Lock()
+        self._next_slot = 0.0
 
     @property
     def model(self) -> str:  # pragma: no cover - overridden
         return "none"
 
+    paced = False  # True for providers with a per-minute request limit (Gemini free tier)
+
     async def _call(self, system: str, prompt: str, schema: dict[str, Any], schema_name: str) -> dict[str, Any]:  # pragma: no cover
         raise NotImplementedError
+
+    async def _pace(self) -> None:
+        rpm = self.settings.llm_requests_per_minute
+        if not self.paced or rpm <= 0:
+            return
+        async with self._pace_lock:
+            now = time.monotonic()
+            wait = self._next_slot - now
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._next_slot = max(now, self._next_slot) + 60.0 / rpm
 
     async def generate_json(self, system: str, prompt: str, schema: dict[str, Any], schema_name: str) -> dict[str, Any]:
         key = hashlib.sha256(json.dumps([self.name, self.model, system, prompt, schema], sort_keys=True).encode()).hexdigest()
@@ -92,18 +120,26 @@ class LlmProvider:
                     return out
                 except json.JSONDecodeError:
                     pass
+        if USAGE.daily_quota_exhausted:
+            raise DailyQuotaExhausted(f"{self.name}: daily request limit already reached in this sync")
         async with self._sem:
             last: Exception | None = None
             out: dict[str, Any] | None = None
             for attempt in range(6):
+                if USAGE.daily_quota_exhausted:
+                    raise DailyQuotaExhausted(f"{self.name}: daily request limit already reached in this sync")
                 delay = 2.0 ** attempt * 2
                 try:
+                    await self._pace()
                     out = await self._call(system, prompt, schema, schema_name)
                     break
                 except (httpx.TransportError, httpx.TimeoutException) as exc:
                     last = exc
                 except LlmError as exc:
                     msg = str(exc)
+                    if _is_daily_quota(msg):
+                        USAGE.daily_quota_exhausted = True
+                        raise DailyQuotaExhausted(f"{self.name}: daily request limit reached ({msg[:160]})") from exc
                     if not (msg.startswith("429") or msg.startswith("5") or any(
                             k in msg.lower() for k in ("overloaded", "resource_exhausted", "unavailable", "rate", "quota"))):
                         raise

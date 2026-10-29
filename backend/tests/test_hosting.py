@@ -159,3 +159,61 @@ def test_llm_usage_counts_calls_cache_hits_and_failures(monkeypatch):
     u = llm_base.usage_snapshot()
     assert u["cache_hits"] == 1 and u["calls"] == 1 and Fake.n == 2
     assert u["approx_input_tokens"] > 0
+
+
+def test_daily_quota_stops_the_sync_without_waiting(monkeypatch):
+    import asyncio
+
+    from mednik.config import Settings
+    from mednik.services.extraction import extract_guideline_recs
+    from mednik.services.llm import base as llm_base
+
+    class Fake(llm_base.LlmProvider):
+        name = "fake"
+        n = 0
+
+        @property
+        def model(self):
+            return "fake-2"
+
+        async def _call(self, system, prompt, schema, schema_name):
+            Fake.n += 1
+            raise llm_base.LlmError('429 {"error":{"message":"Generate content requests per day limit exceeded on Free Tier"}}')
+
+    slept: list[float] = []
+
+    async def record(d):
+        slept.append(d)
+
+    monkeypatch.setattr(llm_base.asyncio, "sleep", record)
+    prov = Fake(Settings(llm_max_concurrency=1))
+    llm_base.reset_usage()
+    docs = [(f"d{i}", f"unique doc {i}") for i in range(6)]
+    asyncio.run(extract_guideline_recs(docs, {"x": ["x"]}, "Schizophrenia", provider=prov))
+    u = llm_base.usage_snapshot()
+    assert Fake.n == 1 and u["failed"] == 6 and u["daily_quota_exhausted"] and not slept  # one attempt, no back-off
+    llm_base.reset_usage()
+    assert not llm_base.usage_snapshot()["daily_quota_exhausted"]  # a new sync tries again
+
+
+def test_gemini_requests_are_paced(monkeypatch):
+    import asyncio
+
+    from mednik.config import Settings
+    from mednik.services.llm import base as llm_base
+    from mednik.services.llm.gemini import GeminiProvider
+
+    waits: list[float] = []
+
+    async def record(d):
+        waits.append(round(d, 1))
+
+    monkeypatch.setattr(llm_base.asyncio, "sleep", record)
+    prov = GeminiProvider(Settings(llm_requests_per_minute=6, gemini_api_key="k"))
+
+    async def go():
+        for _ in range(3):
+            await prov._pace()
+
+    asyncio.run(go())
+    assert waits == [10.0, 20.0]  # 6/min → one request every 10 s (sleep is mocked, so waits accumulate)

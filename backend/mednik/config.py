@@ -62,7 +62,10 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = Field(
         default=None, validation_alias=AliasChoices("MEDNIK_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")
     )
-    gemini_model: str = "gemini-3.8-flash"
+    # Free-tier limits (Oct 2026, per project and model): gemini-3.8-flash / 3.6-flash 20 requests/day and 5/min;
+    # gemini-3.5-flash-lite 500/day and 10/min. A full sync needs up to ~65 requests, so the default is the lite model.
+    gemini_model: str = "gemini-3.5-flash-lite"
+    llm_requests_per_minute: int = 8  # client-side pacing for Gemini (0 = off); set to 4 on a 5-requests/min model
     anthropic_api_key: str | None = Field(
         default=None, validation_alias=AliasChoices("MEDNIK_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY")
     )

@@ -42,7 +42,7 @@ Deterministic parsing (labels, registry, statistics, tiering) needs no key. LLM 
 
 | Provider | Settings |
 |---|---|
-| Gemini (default) | `GEMINI_API_KEY`, `MEDNIK_GEMINI_MODEL` (default `gemini-3.8-flash`) |
+| Gemini (default) | `GEMINI_API_KEY`, `MEDNIK_GEMINI_MODEL` (default `gemini-3.5-flash-lite`: Gemini's free tier allows 500 requests/day on it, only 20/day on `gemini-3.8-flash`; a full sync needs up to ~65) |
 | Claude | `MEDNIK_LLM_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` |
 | Local / on-prem (Ollama, vLLM) | `MEDNIK_LLM_PROVIDER=openai_compat`, `MEDNIK_OPENAI_COMPAT_BASE_URL`, `MEDNIK_OPENAI_COMPAT_MODEL` |
 
