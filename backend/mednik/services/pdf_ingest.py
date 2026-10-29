@@ -11,7 +11,6 @@ import logging
 import re
 from typing import Any
 
-import pymupdf
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -35,6 +34,8 @@ SECTION_MAP = {"abstract": "ABSTRACT", "introduction": "INTRODUCTION", "backgrou
 
 
 def extract_pdf(data: bytes) -> dict[str, Any]:
+    import pymupdf  # imported on use: ~150 MB resident, too much to hold on a 512 MB host
+
     doc = pymupdf.open(stream=data, filetype="pdf")
     pages: list[str] = []
     tables: list[dict[str, Any]] = []

@@ -228,6 +228,8 @@ def main() -> int:
         dossier = c.get("/api/v1/export/dossier", params={"indication": args.indication, "asset_a": a_name, "comparators": comps})
         (ROOT / "verification_dossier.md").write_text(dossier.text, encoding="utf-8")
         rep.check("Dossier export", dossier.status_code == 200 and bool(NCT.search(dossier.text)), "backend/verification_dossier.md")
+        pdf = c.get("/api/v1/export/dossier", params={"indication": args.indication, "asset_a": a_name, "comparators": comps, "format": "pdf"})
+        rep.check("Dossier PDF export", pdf.status_code == 200 and pdf.content[:5] == b"%PDF-", f"{len(pdf.content) // 1024} KB", hard=False)
     return finish(rep, out)
 
 

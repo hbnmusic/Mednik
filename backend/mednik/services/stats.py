@@ -11,14 +11,16 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Sequence
+from statistics import NormalDist
 
-from scipy import stats as sps
-
-Z975 = float(sps.norm.ppf(0.975))
+# Normal quantiles come from the standard library; scipy (≈90 MB resident) is imported only for the
+# t distribution, so the hosted server stays small until a p-value back-calculation is needed.
+_N = NormalDist()
+Z975 = _N.inv_cdf(0.975)
 
 
 def z_for_ci(ci_pct: float = 95.0) -> float:
-    return float(sps.norm.ppf(0.5 + ci_pct / 200.0))
+    return _N.inv_cdf(0.5 + ci_pct / 200.0)
 
 
 def sd_from_se(se: float | None, n: int | None) -> float | None:
@@ -76,6 +78,8 @@ def cohens_d_from_p(diff_sign: float, p: float, n1: int, n2: int) -> tuple[float
     """Back-calculate |d| from a two-sided p-value (t approximation). Used only when no CI/SD is reported."""
     if p is None or not (0 < p < 1) or n1 <= 1 or n2 <= 1:
         return None
+    from scipy import stats as sps
+
     df = n1 + n2 - 2
     t = float(sps.t.isf(p / 2, df))
     d = t * math.sqrt(1 / n1 + 1 / n2) * (1 if diff_sign >= 0 else -1)
@@ -139,8 +143,8 @@ def n_per_arm_continuous(d: float, alpha: float = 0.05, power: float = 0.80, rat
     d = abs(d)
     if d <= 0:
         return None
-    za = float(sps.norm.ppf(1 - alpha / 2))
-    zb = float(sps.norm.ppf(power))
+    za = _N.inv_cdf(1 - alpha / 2)
+    zb = _N.inv_cdf(power)
     n1 = (1 + 1 / ratio) * (za + zb) ** 2 / d ** 2
     n1 += za ** 2 / 4  # small-sample (t) correction
     return int(math.ceil(n1))
@@ -149,8 +153,8 @@ def n_per_arm_continuous(d: float, alpha: float = 0.05, power: float = 0.80, rat
 def n_per_arm_proportions(p1: float, p2: float, alpha: float = 0.05, power: float = 0.80) -> int | None:
     if p1 is None or p2 is None or abs(p1 - p2) < 1e-6:
         return None
-    za = float(sps.norm.ppf(1 - alpha / 2))
-    zb = float(sps.norm.ppf(power))
+    za = _N.inv_cdf(1 - alpha / 2)
+    zb = _N.inv_cdf(power)
     pbar = (p1 + p2) / 2
     num = (za * math.sqrt(2 * pbar * (1 - pbar)) + zb * math.sqrt(p1 * (1 - p1) + p2 * (1 - p2))) ** 2
     return int(math.ceil(num / (p1 - p2) ** 2))
@@ -164,6 +168,6 @@ def inflate_for_dropout(n: int | None, dropout: float) -> int | None:
 
 
 def power_for_n(d: float, n_per_arm: int, alpha: float = 0.05) -> float:
-    za = float(sps.norm.ppf(1 - alpha / 2))
+    za = _N.inv_cdf(1 - alpha / 2)
     ncp = abs(d) * math.sqrt(n_per_arm / 2)
-    return float(sps.norm.cdf(ncp - za))
+    return _N.cdf(ncp - za)

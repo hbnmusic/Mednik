@@ -18,8 +18,18 @@ export function url(path: string, params?: Params): string {
   return u.toString();
 }
 
+// Hosted deployments use a password sign-in; an expired session sends the browser back to /login.
+function toLogin(r: Response): void {
+  if (r.status === 401 && typeof window !== "undefined") {
+    // /login is served by the API, not by Next.js, so this must be a full page load.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+  }
+}
+
 export async function get<T>(path: string, params?: Params): Promise<T> {
   const r = await fetch(url(path, params), { cache: "no-store" });
+  toLogin(r);
   if (!r.ok) {
     let msg = r.statusText;
     try {
@@ -36,6 +46,7 @@ export async function send<T>(path: string, method: "POST" | "PUT", body?: unkno
     headers: body instanceof FormData ? undefined : { "content-type": "application/json" },
     body: body instanceof FormData ? body : JSON.stringify(body ?? {}),
   });
+  toLogin(r);
   if (!r.ok) {
     let msg = r.statusText;
     try {
@@ -54,6 +65,7 @@ export interface Health {
   llm_provider: string;
   llm_enabled: boolean;
   llm_model?: string;
+  auth_required?: boolean;
   counts: { assets: number; studies: number; endpoints: number; documents: number };
 }
 

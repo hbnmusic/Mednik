@@ -11,6 +11,7 @@ from typing import Any, Literal
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -39,6 +40,7 @@ from ..services.guidelines import DEFAULT_RULES, extract_and_store_guideline_rec
 from ..services.heatmap import build_heatmap, cell_evidence
 from ..services.ingest_pipeline import create_job, ensure_asset, ensure_indication, run_ingest
 from ..services.literature_ingest import doc_sponsor_class, persist_literature_endpoints
+from ..services.maintenance import mark_interrupted_jobs, purge_api_cache
 from ..services.matrix import asset_label, build_matrix, node_detail
 from ..services.mvd import compute_mvds, effective_scores, serialize_driver
 from ..services.pdf_ingest import extraction_text, store_pdf
@@ -46,6 +48,7 @@ from ..services.regulatory_ingest import load_parsed_label
 from ..services.study_concepts import generate_study_concept
 from ..services.tiering import TIER_RULES, TIER_WEIGHTS, VALIDITY_RULES
 from ..taxonomy import INDICATIONS, PERSONAS, SCALE_BY_KEY, asset_terms, mvd_profile
+from . import auth
 
 log = logging.getLogger("mednik.api")
 _tasks: set[asyncio.Task] = set()
@@ -54,6 +57,11 @@ _tasks: set[asyncio.Task] = set()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     init_db()
+    try:
+        mark_interrupted_jobs()
+        purge_api_cache()
+    except Exception:  # noqa: BLE001 - housekeeping must never block startup
+        log.exception("startup housekeeping failed")
     yield
     await aclose_shared_client()
 
@@ -62,6 +70,8 @@ app = FastAPI(title="mednik API", version=__version__, lifespan=lifespan,
               description="Medical Affairs strategic intelligence engine — live FDA / NLM / CT.gov / NCBI / Europe PMC evidence synthesis.")
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in get_settings().cors_origins.split(",") if o.strip()],
                    allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.middleware("http")(auth.require_login)
+app.include_router(auth.router)
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +118,7 @@ def parse_overrides(raw: str | None) -> dict[str, float] | None:
 def health(s: Session = Depends(get_session)) -> dict[str, Any]:
     st = get_settings()
     return {"status": "ok", "version": __version__, "llm_provider": st.llm_provider, "llm_enabled": st.llm_enabled,
+            "auth_required": bool(st.app_password),
             "llm_model": {"gemini": st.gemini_model, "anthropic": st.anthropic_model, "openai_compat": st.openai_compat_model}.get(st.llm_provider),
             "counts": {"assets": s.scalar(select(func.count(Asset.id))), "studies": s.scalar(select(func.count(ClinicalStudy.id))),
                        "endpoints": s.scalar(select(func.count(ExtractedEndpoint.id))), "documents": s.scalar(select(func.count(Document.id)))}}
@@ -174,10 +185,20 @@ async def ingest(body: IngestIn, wait: bool = Query(False, description="Run sync
     if wait:
         summary = await run_ingest(jid, req)
         return {"job_id": jid, "summary": summary}
-    t = asyncio.create_task(run_ingest(jid, req))
+    t = asyncio.create_task(_ingest_then_tidy(jid, req))
     _tasks.add(t)
     t.add_done_callback(_tasks.discard)
     return {"job_id": jid, "status": "queued"}
+
+
+async def _ingest_then_tidy(jid: str, req: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return await run_ingest(jid, req)
+    finally:
+        try:
+            await asyncio.to_thread(purge_api_cache)
+        except Exception:  # noqa: BLE001
+            log.exception("cache purge failed")
 
 
 @app.get("/api/v1/jobs/{job_id}")
@@ -455,3 +476,10 @@ def export_dossier(indication: str, asset_a: str, comparators: str, format: Lite
 async def unhandled(_, exc: Exception):  # pragma: no cover
     log.exception("unhandled error")
     return JSONResponse(status_code=500, content={"detail": f"{type(exc).__name__}: {exc}"})
+
+
+# The built dashboard (frontend/out) is served from the same origin when MEDNIK_STATIC_DIR is set (container
+# deployments). Mounted last so every /api route above takes precedence.
+_static = get_settings().static_dir
+if _static and _static.is_dir():
+    app.mount("/", StaticFiles(directory=str(_static), html=True), name="dashboard")

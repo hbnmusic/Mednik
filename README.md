@@ -8,7 +8,17 @@ Medical Affairs strategic intelligence engine. mednik pulls live regulatory, reg
 
 Every number traces to a source: a ClinicalTrials.gov registry field, a USPI section (by LOINC code) or a verbatim quote validated against the retrieved text (PMID, NCT ID, SPL Set ID or PDF SHA-256).
 
-## Run it without installing anything
+## Hosted (one link): Render + Supabase
+
+`render.yaml` and the root `Dockerfile` deploy mednik as one web service on Render's free plan, with its data in a Supabase Postgres database (tables live in a `mednik` schema that Supabase's public API cannot reach). The dashboard and API share one address and are behind a single password.
+
+1. **Database URL.** In Supabase open the Mednik project → **Connect** → **Session pooler** and copy the URI. Replace `[YOUR-PASSWORD]` with the database password (forgotten it? Project Settings → Database → Reset database password). Use the session pooler: the direct connection is IPv6-only on the Free plan, while the pooler also works over IPv4.
+2. **Render.** At render.com sign in with GitHub → **New → Blueprint** → choose this repository (allow Render's GitHub app to see it if the repo is private). Render reads `render.yaml` and asks for three values: `MEDNIK_APP_PASSWORD` (any password you choose), `MEDNIK_DATABASE_URL` (step 1) and `GEMINI_API_KEY` (optional). Click **Apply**.
+3. When the first build finishes, open the `https://mednik-….onrender.com` address shown on the service page, sign in, and choose **Sync live data**.
+
+Free-plan behaviour: the service sleeps after 15 minutes without visits and takes about a minute to wake; it has 0.1 CPU and 512 MB, so a first sync is slower than on a laptop. A sync interrupted by sleep is marked as interrupted and can be re-run; data already saved stays in Supabase. Supabase pauses free projects after about a week without activity (resume it from the Supabase dashboard). Every push to `main` redeploys automatically.
+
+## Run it without installing anything (GitHub)
 
 - **In your browser (GitHub Codespaces):** on the repo page choose **Code → Codespaces → Create codespace on main**. The container installs mednik and opens the dashboard in a new tab (first start takes a few minutes). To enable LLM extraction there, add a `GEMINI_API_KEY` Codespaces secret for this repository (GitHub → Settings → Codespaces → Secrets).
 - **Live verification (GitHub Actions):** every push to `main` that touches `backend/` runs the offline tests and the live end-to-end verification against the public APIs. Read the report on the run page under **Actions → mednik verification**, or on the `verification` branch. Run it on demand with **Run workflow** (you can pick the indication). Add `GEMINI_API_KEY` (and optionally `NCBI_API_KEY`) as repository Actions secrets to include LLM extraction.
@@ -81,7 +91,7 @@ backend/                     FastAPI · SQLAlchemy (SQLite, PostgreSQL-ready) ·
 frontend/                    Next.js 16 (App Router) · Tailwind v4 · Radix · ECharts
 ```
 
-Two SQLite files are created in `backend/`: `mednik.db` (domain data) and `mednik_cache.db` (live-payload cache, LLM cache, citation audit, job log). Both are gitignored, as are `.env` and `backend/uploads/`. Set `MEDNIK_DATABASE_URL` to a PostgreSQL URL to move off SQLite.
+Locally, two SQLite files are created in `backend/`: `mednik.db` (domain data) and `mednik_cache.db` (live-payload cache, LLM cache, citation audit, job log). Both are gitignored, as are `.env` and `backend/uploads/`. Set `MEDNIK_DATABASE_URL` to a PostgreSQL URL (e.g. Supabase) to use one database for both stores; tables are created in the `MEDNIK_DB_SCHEMA` schema (default `mednik`), and `MEDNIK_CACHE_MAX_MB` caps stored raw API payloads. The test suite also runs against PostgreSQL with `MEDNIK_TEST_DATABASE_URL`.
 
 ## Method summary
 

@@ -20,10 +20,20 @@ class Settings(BaseSettings):
     )
 
     # --- storage -----------------------------------------------------------
-    database_url: str = f"sqlite:///{ROOT / 'mednik.db'}"
+    database_url: str = Field(
+        default=f"sqlite:///{ROOT / 'mednik.db'}", validation_alias=AliasChoices("MEDNIK_DATABASE_URL", "DATABASE_URL")
+    )
     aux_database_url: str | None = None  # cache / audit / job log; defaults to a sibling SQLite file
+    db_schema: str = "mednik"  # PostgreSQL only: tables live here, outside Supabase's API-exposed `public` schema
+    db_pool_size: int = 3  # PostgreSQL only: keep well under the Supabase pooler's connection limit
+    db_max_overflow: int = 2
     upload_dir: Path = ROOT / "uploads"
     cache_ttl_hours: int = 24 * 7  # live API payloads are re-fetched after this
+    cache_max_mb: int = 0  # >0 caps stored raw API payloads (LLM responses are kept); 0 = TTL purge only
+
+    # --- hosting -------------------------------------------------------------------
+    app_password: str | None = None  # when set, every page and API call needs a login (hosted deployments)
+    static_dir: Path | None = None  # built dashboard (frontend/out) served by the API itself
 
     # --- public API politeness --------------------------------------------
     contact_email: str = "mednik@example.org"  # sent to NCBI / Europe PMC as `email`
@@ -58,6 +68,10 @@ class Settings(BaseSettings):
 
     # --- CORS --------------------------------------------------------------------
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    @property
+    def is_postgres(self) -> bool:
+        return self.database_url.startswith(("postgres://", "postgresql"))
 
     @property
     def aux_url(self) -> str:

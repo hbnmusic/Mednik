@@ -1,0 +1,27 @@
+# Render Blueprint for mednik (Render dashboard → New → Blueprint → pick this repository).
+# Render asks for the three `sync: false` values once, when the Blueprint is created.
+services:
+  - type: web
+    name: mednik
+    runtime: docker
+    plan: free            # 0.1 CPU / 512 MB; sleeps after 15 min without traffic, ~1 min to wake
+    region: virginia      # next to a Supabase project in us-east-1
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: MEDNIK_APP_PASSWORD     # the password you will type to open mednik
+        sync: false
+      - key: MEDNIK_DATABASE_URL     # Supabase → Connect → "Session pooler" URI, with your database password filled in
+        sync: false
+      - key: GEMINI_API_KEY          # LLM extraction; leave empty to run deterministic parsing only
+        sync: false
+      - key: MEDNIK_LLM_PROVIDER
+        value: gemini
+      - key: MEDNIK_LLM_MAX_CONCURRENCY
+        value: "2"
+      - key: MEDNIK_CACHE_MAX_MB     # keeps raw API payloads well under Supabase Free's 500 MB database limit
+        value: "150"
+      - key: MEDNIK_CONTACT_EMAIL
+        value: mednik@example.org

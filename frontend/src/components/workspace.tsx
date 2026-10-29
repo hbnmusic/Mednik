@@ -267,6 +267,7 @@ export function Workspace() {
           </span>
         )}
         {health && <span className="hidden md:inline">{health.counts.assets} assets, {health.counts.studies} studies, {health.counts.endpoints} endpoints, {health.counts.documents} documents</span>}
+        {health?.auth_required && <a href="/logout" className="underline-offset-2 hover:text-ink hover:underline">Sign out</a>}
         {job && (
           <button type="button" onClick={() => setLogOpen(!logOpen)} className="ml-auto flex min-w-0 items-center gap-2 text-left hover:text-ink">
             <span className={cn("shrink-0 font-medium", job.status === "error" ? "text-critical" : job.status === "done" ? "text-good" : "text-accent")}>

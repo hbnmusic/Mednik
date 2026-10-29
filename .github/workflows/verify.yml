@@ -33,6 +33,14 @@ jobs:
       run:
         shell: bash
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -45,7 +53,12 @@ jobs:
       - name: Install
         run: pip install -r requirements.txt
 
-      - name: Offline tests
+      - name: Offline tests (SQLite)
+        run: python -m pytest -q
+
+      - name: Offline tests (PostgreSQL)
+        env:
+          MEDNIK_TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: python -m pytest -q
 
       - name: Restore live-API cache
@@ -67,12 +80,19 @@ jobs:
         run: |
           args=(--indication "${{ inputs.indication || 'Schizophrenia' }}")
           if [ "${{ inputs.no_cobenfy }}" = "true" ]; then args+=(--no-cobenfy); fi
-          python scripts/verify_e2e.py "${args[@]}" 2>&1 | tee verify.log
+          # peak memory / CPU time of the whole in-process run, to size the 512 MB / 0.1 CPU free host
+          [ -x /usr/bin/time ] || sudo apt-get install -y -qq time >/dev/null
+          set +e
+          /usr/bin/time -f "PEAK_RSS_MB=%M CPU_S=%U+%S WALL_S=%e" -o resources.txt python scripts/verify_e2e.py "${args[@]}" 2>&1 | tee verify.log
+          status=${PIPESTATUS[0]}
+          awk '{ split($1,a,"="); printf "PEAK_RSS_MB=%d %s %s\n", a[2]/1024, $2, $3 }' resources.txt | tee -a verify.log
+          exit $status
 
       - name: Report on the run page
         if: always()
         run: |
           if [ -f verification_report.md ]; then cat verification_report.md >> "$GITHUB_STEP_SUMMARY"; else echo "No report produced — see the log." >> "$GITHUB_STEP_SUMMARY"; fi
+          if [ -f resources.txt ]; then echo "" >> "$GITHUB_STEP_SUMMARY"; echo "Resources: \`$(tail -n1 verify.log)\`" >> "$GITHUB_STEP_SUMMARY"; fi
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -6,7 +6,6 @@ import io
 from datetime import datetime, timezone
 
 import markdown as md_lib
-import pymupdf
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -141,6 +140,8 @@ a { color: #1d4ed8; }
 
 def markdown_to_pdf(md_text: str) -> bytes:
     html = md_lib.markdown(md_text, extensions=["tables"])
+    import pymupdf  # imported on use (large resident footprint)
+
     story = pymupdf.Story(html=f"<html><body>{html}</body></html>", user_css=CSS)
     buf = io.BytesIO()
     writer = pymupdf.DocumentWriter(buf)

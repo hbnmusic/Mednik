@@ -1,0 +1,14 @@
+.git
+.github
+.devcontainer
+.env
+**/.env
+**/node_modules
+frontend/.next
+frontend/out
+backend/.venv
+backend/**/__pycache__
+backend/*.db*
+backend/uploads
+backend/verification_*
+backend/verify.log

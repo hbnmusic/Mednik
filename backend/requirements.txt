@@ -10,6 +10,7 @@ scipy>=1.13
 pymupdf>=1.24
 python-multipart>=0.0.9
 markdown>=3.6
+psycopg[binary]>=3.2  # PostgreSQL (e.g. Supabase) when MEDNIK_DATABASE_URL points to one
 
 # dev / test
 pytest>=8

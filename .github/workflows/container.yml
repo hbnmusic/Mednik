@@ -1,0 +1,64 @@
+name: mednik container
+
+# Builds the same Docker image Render deploys and smoke-tests it against PostgreSQL:
+# password sign-in, dashboard, API, and the idle memory footprint.
+
+on:
+  push:
+    branches: [main]
+    paths: ["Dockerfile", ".dockerignore", "render.yaml", "backend/**", "frontend/**", ".github/workflows/container.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t mednik:ci .
+
+      - name: Run container (512 MB limit, like Render Free)
+        run: |
+          docker run -d --name mednik --network host --memory 512m \
+            -e PORT=10000 -e MEDNIK_APP_PASSWORD=ci-password \
+            -e MEDNIK_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/postgres \
+            -e MEDNIK_LLM_PROVIDER=none mednik:ci
+          for i in $(seq 1 60); do curl -fs localhost:10000/healthz && break; sleep 1; done
+          docker logs mednik | tail -20
+
+      - name: Smoke test
+        run: |
+          set -e
+          jar=$(mktemp)
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:10000/api/v1/health)" = 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:10000/)" = 303
+          test "$(curl -s -o /dev/null -w '%{http_code}' -d 'password=wrong' localhost:10000/login)" = 401
+          test "$(curl -s -c "$jar" -o /dev/null -w '%{http_code}' -d 'password=ci-password&next=/' localhost:10000/login)" = 303
+          curl -fs -b "$jar" localhost:10000/ | grep -q '<html'
+          asset=$(curl -fs -b "$jar" localhost:10000/ | grep -o '/_next/static/[^"]*\.js' | head -1)
+          curl -fs -b "$jar" -o /dev/null "localhost:10000$asset"
+          curl -fs -b "$jar" localhost:10000/api/v1/health | tee /dev/stderr | grep -q '"auth_required":true'
+          curl -fs -b "$jar" localhost:10000/api/v1/meta > /dev/null
+          echo "Idle memory: $(docker stats --no-stream --format '{{.MemUsage}}' mednik)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Image size: $(docker image inspect mednik:ci --format '{{.Size}}' | awk '{printf "%.0f MB", $1/1048576}')" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Container log
+        if: always()
+        run: docker logs mednik 2>&1 | tail -50
