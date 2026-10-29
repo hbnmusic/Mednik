@@ -71,8 +71,10 @@ jobs:
       - name: Live end-to-end verification
         id: live
         continue-on-error: true
+        timeout-minutes: 40  # leaves time to publish verify.log (progress so far) if a sync stalls
         env:
           PYTHONUTF8: "1"
+          PYTHONUNBUFFERED: "1"
           MEDNIK_LLM_PROVIDER: ${{ secrets.GEMINI_API_KEY != '' && 'gemini' || 'none' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
@@ -120,5 +122,5 @@ jobs:
           git push -fq "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" verification
 
       - name: Fail the run if verification failed
-        if: steps.live.outcome == 'failure'
+        if: steps.live.outcome == 'failure' || steps.live.outcome == 'cancelled'
         run: exit 1
