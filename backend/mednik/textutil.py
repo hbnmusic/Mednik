@@ -136,8 +136,31 @@ def parse_age_years(s: str | None) -> float | None:
 # ---------------------------------------------------------------------------
 
 
+def _local(tag) -> str:
+    return tag.rsplit("}", 1)[-1] if isinstance(tag, str) else ""
+
+
 def _cell_text(el) -> str:
-    return clean_ws(" ".join(el.itertext()))
+    """Cell text without footnote markers (<sup>, <footnoteRef>) and with XML layout whitespace collapsed."""
+    out: list[str] = []
+
+    def walk(node):
+        name = _local(node.tag)
+        if name in ("sup", "footnoteRef", "footnote"):
+            if node.tail:
+                out.append(node.tail)
+            return
+        if node.text and name:
+            out.append(node.text)
+        for ch in node:
+            walk(ch)
+        if name in ("paragraph", "br", "p", "item"):
+            out.append(" ")
+        if node.tail and node is not el:
+            out.append(node.tail)
+
+    walk(el)
+    return re.sub(r"\s+", " ", "".join(out)).strip()
 
 
 def grid_from_table_element(table, ns: str | None = None) -> dict[str, Any]:

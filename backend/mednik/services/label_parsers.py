@@ -74,6 +74,10 @@ class SplDocument:
 _BLOCK_TAGS = {f"{{{V3}}}{t}" for t in ("paragraph", "title", "item", "tr", "caption", "list", "table", "br")}
 
 
+def _ws(s: str) -> str:
+    return re.sub(r"\s+", " ", s)
+
+
 def _block_text(el) -> str:
     """itertext with line breaks at block elements and ' | ' between table cells; skips <excerpt> (highlights)."""
     out: list[str] = []
@@ -83,10 +87,14 @@ def _block_text(el) -> str:
             return
         if node.tag == f"{{{V3}}}excerpt":
             if node.tail:
-                out.append(node.tail)
+                out.append(_ws(node.tail))
+            return
+        if node.tag in (f"{{{V3}}}sup", f"{{{V3}}}footnote"):
+            if node.tail:
+                out.append(_ws(node.tail))
             return
         if node.text:
-            out.append(node.text)
+            out.append(_ws(node.text))
         for ch in node:
             walk(ch)
         if node.tag in (f"{{{V3}}}td", f"{{{V3}}}th"):
@@ -94,11 +102,12 @@ def _block_text(el) -> str:
         if node.tag in _BLOCK_TAGS:
             out.append("\n")
         if node.tail:
-            out.append(node.tail)
+            out.append(_ws(node.tail))
 
     walk(el)
     txt = "".join(out)
     txt = re.sub(r"[ \t]*\|\s*\n", "\n", txt)
+    txt = re.sub(r"[ \t]*\n[ \t]*", "\n", txt)
     return clean_ws(txt)
 
 
@@ -186,7 +195,10 @@ ENZYME_RE = re.compile(
 )
 STRENGTH_RE = re.compile(r"\b(strong|moderate|weak|potent)\b(?:\s*(?:or|and|/|to|-)\s*(strong|moderate|weak))?", re.I)
 ROLE_AFTER_RE = re.compile(r"^[\s\w/,-]{0,40}?\b(inhibitor|inducer|substrate)s?\b", re.I)
-ROLE_VERB_RE = re.compile(r"\b(inhibit|induc)\w*\b", re.I)
+ROLE_BEFORE_RE = re.compile(
+    r"(?:\b(inhibitor|inducer|substrate)s?\s+of\s+(?:the\s+)?$)|(?:\b(?:drugs?|agents?|medications?|products?)\s+that\s+(?:are\s+)?(?:strongly\s+|moderately\s+)?(inhibit|induce)\w*\s+$)",
+    re.I,
+)
 
 ACTION_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("CONTRAINDICATED", re.compile(r"contraindicat", re.I)),
@@ -247,9 +259,10 @@ def parse_cyp_interactions(sections: dict[str, SplSection], drug_names: list[str
                 rm = ROLE_AFTER_RE.match(after)
                 role = rm.group(1).lower() if rm else None
                 if role is None:
-                    vm = ROLE_VERB_RE.search(unit[max(0, m.start() - 40): m.start()])
+                    vm = ROLE_BEFORE_RE.search(unit[max(0, m.start() - 60): m.start()])
                     if vm:
-                        role = "inhibitor" if vm.group(1).lower().startswith("inhibit") else "inducer"
+                        word = (vm.group(1) or vm.group(2)).lower()
+                        role = "inhibitor" if word.startswith("inhibit") else "inducer" if word.startswith("induc") else "substrate"
                 if role is None:
                     continue
                 before = unit[max(0, m.start() - 40): m.start()]
@@ -262,7 +275,7 @@ def parse_cyp_interactions(sections: dict[str, SplSection], drug_names: list[str
                 found.append((enz, role, strengths or ["unspecified"]))
             # A bare "Intervention: reduce dosage" row following a heading row inherits the heading's enzyme.
             if (not enzymes and action != "MENTION_ONLY" and prev_context
-                    and re.match(r"\s*(intervention|recommendation)", unit, re.I)):
+                    and re.match(r"\s*(intervention|recommendation|prevention\s+or\s+management|management)", unit, re.I)):
                 found = prev_context
             if found:
                 prev_context = found
@@ -286,13 +299,15 @@ def parse_cyp_interactions(sections: dict[str, SplSection], drug_names: list[str
     for r in rules:
         k = f"{r['enzyme']}|{r['modulator']}|{r['strength']}"
         cur = summary.get(k)
-        if cur is None or ACTION_RANK[r["action"]] < ACTION_RANK[cur["action"]]:
+        better = cur is None or ACTION_RANK[r["action"]] < ACTION_RANK[cur["action"]] or (
+            ACTION_RANK[r["action"]] == ACTION_RANK[cur["action"]] and r.get("dose_instruction") and not cur.get("dose_instruction"))
+        if better:
             summary[k] = {**r, "label": f"{r['strength'].title()} {r['enzyme']} {r['modulator']}s" if r["strength"] != "unspecified" else f"{r['enzyme']} {r['modulator']}s"}
     # inherit 'unspecified' strength rules into strong/moderate if those are missing
     for enz in {r["enzyme"] for r in rules if r["enzyme"].startswith("CYP")}:
         for role in ("inhibitor", "inducer"):
             uns = summary.get(f"{enz}|{role}|unspecified")
-            if uns:
+            if uns and uns["action"] not in ("MENTION_ONLY",):
                 for st in ("strong", "moderate"):
                     summary.setdefault(f"{enz}|{role}|{st}", {**uns, "strength": st, "inherited": True,
                                                               "label": f"{st.title()} {enz} {role}s"})
@@ -396,9 +411,9 @@ def parse_dosing(sections: dict[str, SplSection]) -> dict[str, Any]:
     if m:
         start = clean_ws(m.group(3))
     rec = None
-    m = re.search(r"recommended\s+dos(e|age)(\s+range)?\s+(of\s+\w+\s+)?is\s+([^.;]{3,90})", text, re.I)
+    m = re.search(r"recommended\s+(?:[A-Z][\w®™]*\s+)?dos(?:e|age)(?:\s+range)?\s+(?:of\s+[\w®™]+\s+)?is\s+([^.;]{3,90})", text)
     if m:
-        rec = clean_ws(m.group(4))
+        rec = clean_ws(m.group(1))
     mx = None
     m = re.search(r"maximum\s+(recommended\s+)?dos(e|age)[^.]{0,40}?(\d+(?:\.\d+)?\s?mg[^.;]{0,30})", text, re.I)
     if m:
@@ -481,12 +496,15 @@ def parse_indications(sections: dict[str, SplSection]) -> list[dict[str, Any]]:
         key = classify_indication(s)
         if not key:
             continue
-        adj = bool(re.search(r"adjunct", s, re.I))
-        if (key, adj) in seen:
-            continue
-        seen.add((key, adj))
-        pop = "pediatric" if re.search(r"pediatric|adolescent|children|ages?\s+1[0-7]", s, re.I) else "adult"
-        out.append({"indication_key": key, "adjunctive": adj, "population": pop, "verbatim": s[:400]})
+        has_adj = bool(re.search(r"adjunct", s, re.I))
+        flags = [False, True] if has_adj and re.search(r"monotherapy", s, re.I) else [has_adj]
+        pop = "pediatric" if re.search(r"pediatric|adolescent|children|ages?\s+1[0-7]", s, re.I) and not re.search(r"\badult", s, re.I) else "adult"
+        for adj in flags:
+            if (key, adj) in seen:
+                continue
+            seen.add((key, adj))
+            out.append({"indication_key": key, "adjunctive": adj, "population": pop, "verbatim": s[:400],
+                        "includes_pediatric": bool(re.search(r"pediatric|adolescent", s, re.I))})
     return out
 
 
@@ -523,7 +541,13 @@ _N_RE = re.compile(r"\bN\s*=\s*(\d[\d,]*)", re.I)
 
 def _is_numeric_cell(v: str) -> bool:
     v = v.strip()
-    return bool(v) and bool(re.fullmatch(r"[<>≤≥]?\s*[-−]?\d+(\.\d+)?\s*%?\s*\*?|[-–—]|<\s*1", v))
+    return bool(v) and bool(re.fullmatch(
+        r"[<>≤≥+]?\s*[-−–]?\d+(?:\.\d+)?\s*%?\s*[*†‡a-d]?\s*(?:\([^)]*\))?\s*[*†‡a-d]?|[-–—]{1,2}|NA|N/A", v))
+
+
+# one or more numeric values, each optionally followed by %, a footnote mark and a parenthesised SD/SE/CI
+_NUM_START_RE = re.compile(
+    r"^\s*(?:(?:[<>≤≥+]?\s*[-−–]?\d+(?:\.\d+)?\s*%?\s*[*†‡a-d]?\s*(?:\([^)]*\))?\s*[*†‡a-d]?\s*)+|[-–—]{1,2}|NA|N/A)\s*$")
 
 
 def _split_header(tbl: dict[str, Any]) -> tuple[list[str], list[list[str]]]:
@@ -534,25 +558,43 @@ def _split_header(tbl: dict[str, Any]) -> tuple[list[str], list[list[str]]]:
         while rows:
             r = rows[0]
             cells = [c for c in r[1:] if c]
-            if cells and sum(_is_numeric_cell(c) for c in cells) >= max(1, len(cells) // 2):
+            if cells and sum(bool(_NUM_START_RE.match(c)) for c in cells) >= max(1, len(cells) // 2):
                 break
             headers.append(rows.pop(0))
-            if len(headers) >= 3:
+            if len(headers) >= 4:
                 break
     return merge_header_rows(headers), rows
+
+
+_ADJ_ARM_RE = re.compile(r"\+|adjunct|\bADT\b|lithium|valproate|antidepressant", re.I)
+
+
+def max_label_dose_mg(sections: dict[str, SplSection]) -> float | None:
+    """Highest 'maximum recommended dosage' stated in §2 (used to drop above-label dose arms)."""
+    da = sections.get("34068-7")
+    if not da:
+        return None
+    vals = [float(m.group(1)) for m in re.finditer(r"maximum\s+recommended\s+dos(?:e|age)[^.]{0,40}?(\d+(?:\.\d+)?)\s*mg", da.text, re.I)]
+    return max(vals) if vals else None
+
+
+def _arm_min_dose(name: str) -> float | None:
+    m = re.search(r"(\d+(?:\.\d+)?)\s*(?:(?:to|-|–)\s*\d+(?:\.\d+)?\s*)?mg", name, re.I)
+    return float(m.group(1)) if m else None
 
 
 def parse_ae_tables(sections: dict[str, SplSection], drug_terms: list[str]) -> list[dict[str, Any]]:
     sec = sections.get("34084-4")
     if not sec:
         return []
+    max_dose = max_label_dose_mg(sections)
     out: list[dict[str, Any]] = []
     drug_re = re.compile("|".join(re.escape(t) for t in drug_terms), re.I) if drug_terms else None
     for t_i, tbl in enumerate(sec.tables):
         headers, rows = _split_header(tbl)
         if not headers or not rows:
             continue
-        arms = []
+        arms, excluded = [], []
         for c, h in enumerate(headers):
             if c == 0 or not h:
                 continue
@@ -560,11 +602,17 @@ def parse_ae_tables(sections: dict[str, SplSection], drug_terms: list[str]) -> l
             is_drug = bool(drug_re and drug_re.search(h)) or bool(re.search(r"\bmg\b", h, re.I))
             if not (is_pbo or is_drug):
                 continue
+            lo = _arm_min_dose(h)
+            if not is_pbo and max_dose and lo and lo > max_dose:
+                excluded.append(h)  # above the labelled maximum dose (studied, not recommended)
+                continue
             nm = _N_RE.search(h)
             arms.append({"col": c, "name": h, "n": int(nm.group(1).replace(",", "")) if nm else None, "is_placebo": is_pbo})
-        if not arms or not any(a["is_placebo"] for a in arms):
+        if not arms or not any(a["is_placebo"] for a in arms) or all(a["is_placebo"] for a in arms):
             continue
         caption = tbl.get("caption") or ""
+        if not caption and rows and len({c for c in rows[0] if c}) == 1 and re.match(r"\s*table", rows[0][0], re.I):
+            caption = rows[0][0]
         context = f"{caption} {tbl.get('context', '')}"
         parsed_rows = []
         soc = None
@@ -583,13 +631,14 @@ def parse_ae_tables(sections: dict[str, SplSection], drug_terms: list[str]) -> l
                 continue
             if not term:
                 continue
-            parsed_rows.append({"term": re.sub(r"\s*[*†‡§¶#]+$|\s+[a-d]$", "", term).strip(), "soc": soc, "values": vals,
-                                "verbatim": " | ".join(x for x in r if x)[:400]})
+            parsed_rows.append({"term": re.sub(r"\s*[*†‡§¶#⸰]+$|\s+[a-d]$", "", term).strip(), "soc": soc, "values": vals,
+                                "verbatim": " | ".join(dict.fromkeys(x for x in r if x))[:400]})
         if parsed_rows:
             out.append({
                 "table_index": t_i, "caption": caption, "context": tbl.get("context"),
-                "indication_key": classify_indication(context), "arms": arms, "rows": parsed_rows,
-                "footnotes": tbl.get("footnotes", ""),
+                "indication_key": classify_indication(context), "arms": arms, "excluded_arms": excluded,
+                "adjunctive": any(_ADJ_ARM_RE.search(a["name"]) for a in arms if not a["is_placebo"]),
+                "rows": parsed_rows, "footnotes": tbl.get("footnotes", ""),
             })
     return out
 
@@ -599,6 +648,9 @@ def parse_ae_tables(sections: dict[str, SplSection], drug_terms: list[str]) -> l
 # ---------------------------------------------------------------------------
 
 _MEAN_PAREN_RE = re.compile(r"([-−–]?\d+(?:\.\d+)?)\s*(\*+|†|‡)?\s*\(\s*([-−–]?\d+(?:\.\d+)?)\s*(?:,|to)?\s*([-−–]?\d+(?:\.\d+)?)?\s*\)")
+
+
+_PAREN_ITEM_RE = re.compile(r"[-−–]?\d+(?:\.\d+)?\s*\*?\s*\([^)]*\)")
 
 
 def _parse_paren(cell: str) -> dict[str, Any] | None:
@@ -646,52 +698,83 @@ def parse_clinical_studies(sections: dict[str, SplSection]) -> dict[str, Any]:
         headers, rows = _split_header(tbl)
         hl = [h.lower() for h in headers]
 
-        def col(*pats: str) -> int | None:
+        def col(*pats: str, exclude: tuple[int, ...] = ()) -> int | None:
             for i, h in enumerate(hl):
+                if i in exclude:
+                    continue
                 if any(re.search(p, h) for p in pats):
                     return i
             return None
 
-        c_study = col(r"\bstudy\b", r"trial")
-        c_group = col(r"treatment", r"group", r"\bdose\b", r"arm")
-        c_base = col(r"baseline")
-        c_change = col(r"ls\s*mean\s*change", r"change\s+from\s+baseline", r"ls\s*mean")
+        c_study = col(r"\bstudy\b", r"\btrial\b")
+        c_group = col(r"treatment", r"group", r"\bdose\b", r"\barm\b", exclude=(c_study,) if c_study is not None else ())
+        c_n = next((i for i, h in enumerate(hl) if re.fullmatch(r"(.*\s)?n", h.strip()) or re.fullmatch(r"n\s*\(.*\)", h.strip())), None)
+        c_base = col(r"baseline\s+score", r"mean\s+baseline", r"baseline")
+        c_change = col(r"ls\s*mean\s*change", r"change\s+from\s+baseline", r"ls\s*mean", exclude=(c_base,) if c_base is not None else ())
         c_diff = col(r"placebo[-\s]*subtracted", r"difference", r"\bdiff")
-        if c_diff is None or (c_change is None and c_base is None):
+        if c_diff is None or c_group is None or (c_change is None and c_base is None):
             continue
         caption = tbl.get("caption") or ""
+        if not caption:
+            caption = next((h for h in headers if re.search(r"\btable\b", h, re.I)), "")
         context = tbl.get("context") or ""
         scale = classify_scale(caption, " ".join(headers)) or classify_scale(context)
         ind = classify_indication(caption, context)
         foot = tbl.get("footnotes", "") + " " + caption
         multiplicity = bool(re.search(r"multiplicity|multiple\s+comparisons|adjusted\s+for|type\s+i\s+error", foot, re.I))
         tp = parse_weeks(caption) or parse_weeks(" ".join(headers))
-        current_study = None
+        current_study: str | None = None
+        section_label = ""
+
+        def cell(r: list[str], c: int | None) -> str:
+            return r[c].strip() if c is not None and c < len(r) else ""
+
         for r in rows:
-            if c_study is not None and c_study < len(r) and r[c_study].strip():
-                current_study = r[c_study].strip()
-            grp = r[c_group].strip() if c_group is not None and c_group < len(r) else ""
-            if not grp:
+            distinct = {x.strip() for x in r if x.strip()}
+            if len(distinct) == 1 and len(r) > 2:
+                section_label = distinct.pop()  # e.g. "Monotherapy" / "Adjunctive Therapy" spanning row
                 continue
-            diff = _parse_paren(r[c_diff]) if c_diff < len(r) else None
-            base = _parse_paren(r[c_base]) if c_base is not None and c_base < len(r) else None
-            chg = _parse_paren(r[c_change]) if c_change is not None and c_change < len(r) else None
-            nm = _N_RE.search(grp)
+            sc = cell(r, c_study)
+            if sc and sc != cell(r, c_group):
+                current_study = f"Study {sc}" if re.fullmatch(r"\d+", sc) else sc
+            grp = cell(r, c_group)
+            if not grp or re.fullmatch(r"[-–—]*", grp):
+                continue
+            base_c, chg_c, diff_c = cell(r, c_base), cell(r, c_change), cell(r, c_diff)
+            # several arms packed into one cell ("VRAYLAR 1.5 mg (n=145) VRAYLAR 3 mg (n=145) Placebo (n=141)")
+            arms = [a.strip() for a in re.findall(r".+?\(\s*n\s*=\s*\d+\s*\)\s*\*?", grp, re.I)]
+            if len(arms) >= 2:
+                bases, chgs, diffs = _PAREN_ITEM_RE.findall(base_c), _PAREN_ITEM_RE.findall(chg_c), _PAREN_ITEM_RE.findall(diff_c)
+                sub, di = [], 0
+                for i, arm in enumerate(arms):
+                    pbo = bool(re.search(r"placebo", arm, re.I))
+                    d = ""
+                    if not pbo and di < len(diffs):
+                        d, di = diffs[di], di + 1
+                    sub.append((arm, bases[i] if i < len(bases) else "", chgs[i] if i < len(chgs) else "", d, ""))
+            else:
+                sub = [(grp, base_c, chg_c, diff_c, cell(r, c_n) if c_n is not None and c_n not in (c_group, c_study) else "")]
             study_label = re.sub(r"\s+", " ", (current_study or f"Table {t_i + 1}")).strip()
             sm = re.search(r"Study\s*\d+", study_label)
-            rows_out.append({
-                "table_index": t_i, "study_label": sm.group(0) if sm else study_label, "study_cell": study_label,
-                "arm": grp, "is_placebo": bool(re.search(r"placebo", grp, re.I)),
-                "n": int(nm.group(1).replace(",", "")) if nm else None,
-                "baseline_mean": base["value"] if base else None, "baseline_sd": base["a"] if base else None,
-                "ls_change": chg["value"] if chg else None, "ls_change_se": chg["a"] if chg else None,
-                "diff": diff["value"] if diff else None,
-                "ci_low": diff["a"] if diff else None, "ci_high": diff["b"] if diff else None,
-                "flag_significant": bool(diff and diff["flag"]),
-                "multiplicity_footnote": multiplicity,
-                "scale": scale, "indication_key": ind, "timepoint_weeks": tp,
-                "caption": caption, "verbatim": " | ".join(x for x in r if x)[:400],
-            })
+            for arm, b_c, ch_c, d_c, n_c in sub:
+                diff = _parse_paren(d_c)
+                base = _parse_paren(b_c)
+                chg = _parse_paren(ch_c)
+                nm = _N_RE.search(arm)
+                n_val = int(nm.group(1).replace(",", "")) if nm else (int(parse_number(n_c)) if parse_number(n_c) else None)
+                rows_out.append({
+                    "table_index": t_i, "study_label": sm.group(0) if sm else study_label, "study_cell": study_label,
+                    "arm": arm, "is_placebo": bool(re.search(r"placebo", arm, re.I)), "n": n_val,
+                    "baseline_mean": base["value"] if base else None, "baseline_sd": base["a"] if base else None,
+                    "ls_change": chg["value"] if chg else None, "ls_change_se": chg["a"] if chg else None,
+                    "diff": diff["value"] if diff else None,
+                    "ci_low": diff["a"] if diff else None, "ci_high": diff["b"] if diff else None,
+                    "flag_significant": bool(diff and diff["flag"]) or ("*" in arm and not re.search(r"placebo", arm, re.I)),
+                    "multiplicity_footnote": multiplicity,
+                    "adjunctive": bool(_ADJ_ARM_RE.search(arm) or re.search(r"adjunct", section_label, re.I)),
+                    "scale": scale, "indication_key": ind, "timepoint_weeks": tp,
+                    "caption": caption, "verbatim": " | ".join(dict.fromkeys(x for x in r if x))[:400],
+                })
     for row in rows_out:
         if row["timepoint_weeks"] is None:
             row["timepoint_weeks"] = durations.get(row["study_label"])

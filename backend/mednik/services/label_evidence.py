@@ -34,7 +34,6 @@ def persist_label_evidence(session: Session, asset: Asset, parsed: dict[str, Any
     session.execute(delete(ClinicalStudy).where(ClinicalStudy.asset_id == asset.id, ClinicalStudy.source == "uspi"))
     session.flush()
     set_id = asset.spl_set_id or "USPI"
-    adjunctive_inds = {i["indication_key"] for i in parsed.get("indications", []) if i.get("adjunctive")}
     n_eff = n_ae = 0
 
     # ---- §14 efficacy rows ----------------------------------------------------
@@ -76,7 +75,7 @@ def persist_label_evidence(session: Session, asset: Asset, parsed: dict[str, Any
                 ci_95_lower=g.get("ci_low"), ci_95_upper=g.get("ci_high"), is_multiplicity_controlled=g.get("multiplicity_footnote") or None,
                 is_primary=True, is_post_hoc=False, n_treatment=g.get("n"), n_comparator=pbo.get("n") if pbo else None,
                 cohens_d=d, cohens_d_var=dvar, favorable=(g["diff"] < 0) if sdef.lower_is_better else (g["diff"] > 0), significant=bool(sig),
-                label_confirmed=True, column_key=column_for(ind_key, "adult", ind_key in adjunctive_inds, g.get("timepoint_weeks")),
+                label_confirmed=True, column_key=column_for(ind_key, "adult", bool(g.get("adjunctive")), g.get("timepoint_weeks")),
                 verbatim_quote=g["verbatim"], source_id=set_id, source_type="uspi", extraction_method="deterministic_label_table",
                 evidence_tier="1A", validity_level=5,
             ))
@@ -121,7 +120,7 @@ def persist_label_evidence(session: Session, asset: Asset, parsed: dict[str, Any
                     risk_difference=rd, nnt_nnh=stats.nnt_from_rd(rd), ci_95_lower=rdlo, ci_95_upper=rdhi,
                     n_treatment=arm.get("n"), n_comparator=pbo_arm.get("n"), favorable=rd <= 0.02, significant=(rdlo is not None and rdlo > 0),
                     is_primary=False, label_confirmed=True,
-                    column_key=column_for(ind_key, "adult", ind_key in adjunctive_inds, 6.0),
+                    column_key=column_for(ind_key, "adult", bool(tbl.get("adjunctive")), 6.0),
                     verbatim_quote=row["verbatim"], source_id=set_id, source_type="uspi", extraction_method="deterministic_label_table",
                     evidence_tier="1A", validity_level=5,
                 ))

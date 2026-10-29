@@ -231,7 +231,7 @@ export function Workspace() {
         <div className="min-h-0 flex-1">
           {apiDown ? (
             <Empty title="mednik can't reach its backend">
-              Start it with <code className="rounded bg-raised px-1">make dev</code> (or <code className="rounded bg-raised px-1">uvicorn mednik.api.main:app --port 8000</code> in <code>backend/</code>), then reload. Expected at {url("/api/v1/health")}.
+              Start it with <code className="rounded bg-raised px-1">python mednik.py dev</code> from the repository folder (in a Codespace it starts automatically), then reload.
             </Empty>
           ) : noData ? (
             <Empty title="No evidence ingested yet">

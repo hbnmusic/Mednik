@@ -8,7 +8,12 @@ Medical Affairs strategic intelligence engine. mednik pulls live regulatory, reg
 
 Every number traces to a source: a ClinicalTrials.gov registry field, a USPI section (by LOINC code) or a verbatim quote validated against the retrieved text (PMID, NCT ID, SPL Set ID or PDF SHA-256).
 
-## Quick start
+## Run it without installing anything
+
+- **In your browser (GitHub Codespaces):** on the repo page choose **Code → Codespaces → Create codespace on main**. The container installs mednik and opens the dashboard in a new tab (first start takes a few minutes). To enable LLM extraction there, add a `GEMINI_API_KEY` Codespaces secret for this repository (GitHub → Settings → Codespaces → Secrets).
+- **Live verification (GitHub Actions):** every push to `main` that touches `backend/` runs the offline tests and the live end-to-end verification against the public APIs. Read the report on the run page under **Actions → mednik verification**, or on the `verification` branch. Run it on demand with **Run workflow** (you can pick the indication). Add `GEMINI_API_KEY` (and optionally `NCBI_API_KEY`) as repository Actions secrets to include LLM extraction.
+
+## Quick start (local)
 
 Requires Python 3.11+ and Node.js 20+.
 

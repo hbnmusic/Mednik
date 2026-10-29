@@ -1,0 +1,18 @@
+{
+  "name": "mednik",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "postCreateCommand": "python mednik.py setup",
+  "postAttachCommand": { "mednik": "python mednik.py dev" },
+  "forwardPorts": [3000, 8000],
+  "portsAttributes": {
+    "3000": { "label": "mednik dashboard", "onAutoForward": "openBrowser" },
+    "8000": { "label": "mednik API", "onAutoForward": "silent" }
+  },
+  "secrets": {
+    "GEMINI_API_KEY": { "description": "Optional. Enables LLM extraction of paper effect sizes, preference weights and guideline positions." }
+  }
+}

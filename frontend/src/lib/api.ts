@@ -1,4 +1,5 @@
-export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000").replace(/\/$/, "");
+// Empty = same origin (/api/* is proxied to the backend by next.config.ts). Set NEXT_PUBLIC_API_BASE only to bypass the proxy.
+export const API_BASE = (process.env.NEXT_PUBLIC_API_BASE || "").replace(/\/$/, "");
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -9,7 +10,8 @@ export class ApiError extends Error {
 type Params = Record<string, string | number | boolean | null | undefined>;
 
 export function url(path: string, params?: Params): string {
-  const u = new URL(`${API_BASE}${path}`);
+  const origin = API_BASE || (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+  const u = new URL(`${origin}${path}`);
   Object.entries(params || {}).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== "") u.searchParams.set(k, String(v));
   });

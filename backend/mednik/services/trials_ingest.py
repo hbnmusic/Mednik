@@ -320,8 +320,8 @@ def parse_results(study: dict[str, Any], meta: dict[str, Any], asset_terms: list
         roles = {gid: _group_role(g.get("title"), g.get("description"), asset_terms, single_asset) for gid, g in groups.items()}
         vals, class_title = _pick_measurements(meas)
         denoms = _denoms(meas)
-        param = (meas.get("paramType") or "").upper()
-        disp = (meas.get("dispersionType") or "").upper()
+        param = (meas.get("paramType") or "").upper().replace(" ", "_")
+        disp = (meas.get("dispersionType") or "").upper().replace(" ", "_")  # registry mixes "Standard Error" / STANDARD_ERROR
         unit = (meas.get("unitOfMeasure") or "").lower()
         is_count = param in ("COUNT_OF_PARTICIPANTS",) or ("participant" in unit and param in ("NUMBER", "COUNT_OF_PARTICIPANTS"))
         is_pct = "percent" in unit or "%" in unit
