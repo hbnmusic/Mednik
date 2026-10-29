@@ -25,6 +25,34 @@ def test_vraylar_di_table_strong_or_moderate_inhibitors():
     assert kc["cyp3a4_inducer"] == "AVOID"
 
 
+def test_vraylar_pediatric_only_restriction_does_not_set_adult_class():
+    """Vraylar §2.6 (2026 label, pediatric indication added) has a pediatric-only 'not recommended' sentence;
+    the adult class action must stay 'dose adjustment' with the pediatric rule kept as a population note."""
+    t = _tbl([
+        ["Strong or Moderate CYP3A4 Inhibitors", "Strong or Moderate CYP3A4 Inhibitors"],
+        ["Intervention:", "If VRAYLAR is used with a strong or moderate CYP3A4 inhibitor, reduce VRAYLAR dosage [see Dosage and Administration ( 2.6 ) ]."],
+    ])
+    da_text = ("2.6 Dosage Modifications for Concomitant Use with CYP3A4 Inhibitors or Inducers. "
+               "Initiating VRAYLAR is not recommended in pediatric patients while taking a strong or moderate CYP3A4 Inhibitor. "
+               "Pediatric patients on a stable dose of VRAYLAR who start a strong CYP3A4 inhibitor should have their VRAYLAR dosage reduced by half.")
+    secs = {"34073-7": SplSection("34073-7", "7", "7", [t]), "34068-7": SplSection("34068-7", "2", da_text, [])}
+    cyp = parse_cyp_interactions(secs)
+    kc = cyp["key_classes"]
+    assert kc["strong_cyp3a4_inhibitor"] == "DOSE_ADJUSTMENT"
+    assert kc["moderate_cyp3a4_inhibitor"] == "DOSE_ADJUSTMENT"
+    strong = next(r for r in cyp["summary"] if r["enzyme"] == "CYP3A4" and r["modulator"] == "inhibitor" and r["strength"] == "strong")
+    assert strong["population"] == "general"
+    assert {n["population"] for n in strong["population_rules"]} == {"pediatric"}
+    assert strong["population_rules"][0]["action"] == "AVOID"
+
+
+def test_population_only_rule_is_used_when_no_general_rule():
+    da_text = "Concomitant use of ALPHYL with strong CYP2D6 inhibitors is not recommended in pediatric patients."
+    cyp = parse_cyp_interactions({"34068-7": SplSection("34068-7", "2", da_text, [])})
+    assert cyp["key_classes"]["strong_cyp2d6_inhibitor"] == "AVOID"
+    assert "pediatric only" in cyp["summary"][0]["label"]
+
+
 def test_caplyta_prevention_or_management_rows():
     t = _tbl([
         ["CYP3A4 Inducers*", "CYP3A4 Inducers*"],

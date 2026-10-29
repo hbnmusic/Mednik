@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Asset, Indication, MarketValueDriver, StudyConcept
-from .evidence import source_url
+from .evidence import ref_url
 from .guidelines import gap_to_guideline, guideline_status
 from .heatmap import build_heatmap
 from .matrix import QUADRANTS, asset_label, build_matrix, node_detail
@@ -22,7 +22,7 @@ from .tiering import TIER_RULES, VALIDITY_RULES
 def _cite(ref: str | None) -> str:
     if not ref:
         return ""
-    url = source_url("ctgov" if ref.startswith("NCT") else "pubmed" if ref.isdigit() else "uspi", ref)
+    url = ref_url(ref)
     return f"[{ref}]({url})" if url else ref
 
 

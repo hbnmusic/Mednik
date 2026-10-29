@@ -52,6 +52,26 @@ def source_url(source_type: str | None, source_id: str | None) -> str | None:
     return None
 
 
+_UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+
+def ref_url(ref: str | None) -> str | None:
+    """Link for a bare reference id of unknown type (NCT, PMID, PMCID, Europe PMC preprint, SPL Set ID)."""
+    if not ref:
+        return None
+    ref = ref.strip()
+    if ref.startswith("NCT"):
+        return f"https://clinicaltrials.gov/study/{ref}"
+    if ref.isdigit() and len(ref) <= 9:
+        return f"https://pubmed.ncbi.nlm.nih.gov/{ref}/"
+    m = re.match(r"^(PMC|PPR)\d+$", ref, re.I)
+    if m:
+        return f"https://europepmc.org/article/{m.group(1).upper()}/{ref.upper()}"
+    if _UUID_RE.match(ref):
+        return f"https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid={ref}"
+    return None  # PDF SHA-256 and other local ids have no public URL
+
+
 def _filter_tier(pairs: list[Pair], tier_filter: str) -> list[Pair]:
     if tier_filter == "tier1":
         return [(e, s) for e, s in pairs if e.evidence_tier in ("1A", "1B")]

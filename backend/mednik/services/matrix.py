@@ -250,16 +250,34 @@ def regulatory_diff(a: Asset, pa: dict[str, Any], b: Asset, pb: dict[str, Any]) 
                        ("cyp3a4_inducer", "CYP3A4 inducers"), ("strong_cyp2d6_inhibitor", "Strong CYP2D6 inhibitors")):
         va, vb = pa["cyp"]["key_classes"][cls], pb["cyp"]["key_classes"][cls]
 
-        def quote(p, c):
+        def rule_for(p, c, v):
             enz = "CYP2D6" if "2d6" in c else "CYP3A4"
             role = "inducer" if "inducer" in c else "inhibitor"
             st = "strong" if c.startswith("strong") else "moderate" if c.startswith("moderate") else None
-            for r in p["cyp"]["summary"]:
-                if r["enzyme"] == enz and r["modulator"] == role and (st is None or r["strength"] == st):
-                    return r["verbatim"] + (f" [dose: {r['dose_instruction']}]" if r.get("dose_instruction") else "")
-            return None
+            cands = [r for r in p["cyp"]["summary"]
+                     if r["enzyme"] == enz and r["modulator"] == role and (st is None or r["strength"] == st)]
+            return next((r for r in cands if r["action"] == v), cands[0] if cands else None)
 
-        rows.append(row(label, ACTION_LABEL.get(va, va), ACTION_LABEL.get(vb, vb), quote(pa, cls), quote(pb, cls),
+        def quote(r):
+            if not r:
+                return None
+            q = r["verbatim"] + (f" [dose: {r['dose_instruction']}]" if r.get("dose_instruction") else "")
+            for n in r.get("population_rules") or []:
+                if n["verbatim"] != r["verbatim"]:
+                    q += f" | {n['population'].title()}: {n['verbatim']}"
+            return q
+
+        def value(v, r):
+            out = ACTION_LABEL.get(v, v)
+            if r and r.get("population", "general") != "general":
+                return f"{out} ({r['population']} only)"
+            notes = [n for n in (r or {}).get("population_rules") or [] if n["action"] != v]
+            if notes:
+                out += "; " + "; ".join(f"{n['population']}: {ACTION_LABEL.get(n['action'], n['action']).lower()}" for n in notes)
+            return out
+
+        ra, rb = rule_for(pa, cls, va), rule_for(pb, cls, vb)
+        rows.append(row(label, value(va, ra), value(vb, rb), quote(ra), quote(rb),
                         "A" if rank[va] > rank[vb] else "B" if rank[vb] > rank[va] else None))
     for organ in ("hepatic", "renal"):
         ha, hb = pa["dosing"][organ], pb["dosing"][organ]

@@ -105,9 +105,10 @@ def main() -> int:
             kc = cyp.get("key_classes", {})
             rules = [r for r in cyp.get("summary", []) if r["enzyme"] == "CYP3A4" and not r.get("inherited")]
             rep.check(f"{a['brand']}: §7 CYP3A4 rules extracted with verbatim text", bool(rules) and all(r["verbatim"] for r in rules),
-                      "; ".join(f"{r['label']} → {r['action']}" + (f" [{r['dose_instruction']}]" if r.get("dose_instruction") else "") for r in rules))
+                      "; ".join(f"{r['label']} → {r['action']}" + (f" [{r['dose_instruction']}]" if r.get("dose_instruction") else "")
+                                + "".join(f" ({n['population']}: {n['action']})" for n in r.get("population_rules") or []) for r in rules))
             out.setdefault("cyp", {})[g] = {"key_classes": kc, "rules": [{"label": r["label"], "action": r["action"], "dose": r.get("dose_instruction"),
-                                                                          "verbatim": r["verbatim"]} for r in rules]}
+                                                                          "verbatim": r["verbatim"], "population_rules": r.get("population_rules") or []} for r in rules]}
             for cls, exp in EXPECTED_CYP.get(g, {}).items():
                 rep.check(f"{a['brand']}: {cls} = {exp}", kc.get(cls) == exp, f"parsed {kc.get(cls)}", hard=False)
         actions = {r["action"] for g in out["cyp"].values() for r in g["rules"]}

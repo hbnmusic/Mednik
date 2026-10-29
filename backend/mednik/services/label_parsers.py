@@ -222,6 +222,22 @@ def _norm_enzyme(e: str) -> str:
     return e
 
 
+POP_PEDIATRIC_RE = re.compile(r"\b(pediatric|paediatric|child(?:ren)?|adolescents?)\b", re.I)
+POP_GERIATRIC_RE = re.compile(r"\b(geriatric|elderly)\b", re.I)
+POP_ADULT_RE = re.compile(r"\badults?\b", re.I)
+
+
+def _population(unit: str) -> str:
+    """'general' unless the clause is explicitly restricted to a pediatric or geriatric population."""
+    if POP_ADULT_RE.search(unit):
+        return "general"
+    if POP_PEDIATRIC_RE.search(unit):
+        return "pediatric"
+    if POP_GERIATRIC_RE.search(unit):
+        return "geriatric"
+    return "general"
+
+
 def _classify_action(clause: str, section_loinc: str) -> str:
     if section_loinc == "34070-3":
         return "CONTRAINDICATED"
@@ -281,33 +297,56 @@ def parse_cyp_interactions(sections: dict[str, SplSection], drug_names: list[str
                 prev_context = found
             elif enzymes:
                 prev_context = []  # a different (unresolved) enzyme heading breaks inheritance
+            population = _population(unit)
             for enz, role, strengths in found:
                 for st in strengths:
                     dose_m = DOSE_RE.search(unit) if action == "DOSE_ADJUSTMENT" else None
                     refs = REF_RE.findall(unit)
-                    key = (enz, role, st, action, loinc)
+                    key = (enz, role, st, action, loinc, population)
                     if key in seen:
                         continue
                     seen.add(key)
                     rules.append({
                         "enzyme": enz, "modulator": role, "strength": st, "action": action,
+                        "population": population,
                         "dose_instruction": dose_m.group(1) if dose_m else None,
                         "section_loinc": loinc, "section_refs": refs, "verbatim": unit.strip()[:600],
                     })
 
+    def _label(r: dict[str, Any]) -> str:
+        return f"{r['strength'].title()} {r['enzyme']} {r['modulator']}s" if r["strength"] != "unspecified" else f"{r['enzyme']} {r['modulator']}s"
+
+    def _better(r: dict[str, Any], cur: dict[str, Any] | None) -> bool:
+        return cur is None or ACTION_RANK[r["action"]] < ACTION_RANK[cur["action"]] or (
+            ACTION_RANK[r["action"]] == ACTION_RANK[cur["action"]] and bool(r.get("dose_instruction")) and not cur.get("dose_instruction"))
+
+    # The class-level action comes from rules that apply to the general (adult) label population.
+    # Pediatric- or geriatric-only rules are kept as population notes; they set the class action only
+    # when the label has no general-population rule for that class.
     summary: dict[str, dict[str, Any]] = {}
+    pop_best: dict[str, dict[str, dict[str, Any]]] = {}
     for r in rules:
         k = f"{r['enzyme']}|{r['modulator']}|{r['strength']}"
-        cur = summary.get(k)
-        better = cur is None or ACTION_RANK[r["action"]] < ACTION_RANK[cur["action"]] or (
-            ACTION_RANK[r["action"]] == ACTION_RANK[cur["action"]] and r.get("dose_instruction") and not cur.get("dose_instruction"))
-        if better:
-            summary[k] = {**r, "label": f"{r['strength'].title()} {r['enzyme']} {r['modulator']}s" if r["strength"] != "unspecified" else f"{r['enzyme']} {r['modulator']}s"}
+        if r["population"] == "general":
+            if _better(r, summary.get(k)):
+                summary[k] = {**r, "label": _label(r)}
+        else:
+            bucket = pop_best.setdefault(k, {})
+            if _better(r, bucket.get(r["population"])):
+                bucket[r["population"]] = r
+    for k, bucket in pop_best.items():
+        notes = [{"population": pop, "action": r["action"], "dose_instruction": r.get("dose_instruction"), "verbatim": r["verbatim"]}
+                 for pop, r in sorted(bucket.items())]
+        if k in summary:
+            summary[k]["population_rules"] = notes
+        else:
+            r = min(bucket.values(), key=lambda x: ACTION_RANK[x["action"]])
+            summary[k] = {**r, "label": f"{_label(r)} ({r['population']} only)", "population_rules": notes}
     # inherit 'unspecified' strength rules into strong/moderate if those are missing
     for enz in {r["enzyme"] for r in rules if r["enzyme"].startswith("CYP")}:
         for role in ("inhibitor", "inducer"):
             uns = summary.get(f"{enz}|{role}|unspecified")
-            if uns and uns["action"] not in ("MENTION_ONLY",):
+            if uns and uns["action"] not in ("MENTION_ONLY",) and uns["population"] == "general":
                 for st in ("strong", "moderate"):
                     summary.setdefault(f"{enz}|{role}|{st}", {**uns, "strength": st, "inherited": True,
                                                               "label": f"{st.title()} {enz} {role}s"})
