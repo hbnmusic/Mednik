@@ -1,0 +1,14 @@
+[project]
+name = "mednik"
+version = "0.1.0"
+description = "mednik — Medical Affairs strategic intelligence engine (regulatory, trial, literature evidence synthesis)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "session"
+markers = [
+  "live: hits real public APIs (run with -m live; needs network access to FDA/NLM/CT.gov/NCBI/EBI)",
+]
+addopts = "-m 'not live'"
