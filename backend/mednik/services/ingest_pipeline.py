@@ -18,6 +18,7 @@ from ..models import Asset, ClinicalStudy, Document, Indication, IngestJob
 from ..taxonomy import INDICATION_BY_KEY, asset_terms, classify_indication
 from .extraction import extract_endpoints
 from .guidelines import ingest_guidelines
+from .llm import base as llm_base
 from .label_evidence import link_registry_to_label, mark_replication, persist_label_evidence
 from .literature_ingest import (
     asset_doc_is_extractable,
@@ -95,6 +96,7 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
     with aux_scope() as s:
         job = s.get(IngestJob, job_id)
         job.status = "running"
+    llm_base.reset_usage()
     summary: dict[str, Any] = {"assets": {}, "llm_provider": settings.llm_provider if settings.llm_enabled else "none (deterministic only)"}
     force = bool(request.get("force_refresh"))
     try:
@@ -166,7 +168,7 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
                         ClinicalStudy.asset_id == a.id, ClinicalStudy.source == "ctgov")).scalars().all() if st.nct_id}
                     extractable = [d for d in docs if asset_doc_is_extractable(d, terms)]
                     extractable.sort(key=lambda d: (-len(set(d.evidence_tags_json or []) & {"RCT", "PHASE3", "POST_HOC", "POOLED", "META_ANALYSIS", "NMA", "RWE"}), -(d.year or 0)))
-                    extractable = extractable[: int(request.get("max_extract_docs") or 40)]
+                    extractable = extractable[: int(request.get("max_extract_docs") or (settings.llm_max_asset_docs if settings.llm_enabled else 40))]
                     payload = [(d.pmid or d.source_id, doc_text(d)) for d in extractable]
                     sponsor_by_doc = {d.id: doc_sponsor_class(d, company, trial_sponsors) for d in extractable}
                     docs_by_sid = {(d.pmid or d.source_id): d for d in extractable}
@@ -191,7 +193,7 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
                 await ingest_mvd_literature(s, ind_o, max_pubmed=80, max_epmc=80, force_refresh=force, say=say)
             with session_scope() as s:
                 ind_o = s.get(Indication, ind_id)
-                drivers = await compute_mvds(s, ind_o, say=say)
+                drivers = await compute_mvds(s, ind_o, say=say, max_docs=request.get("max_mvd_docs"))
                 summary["mvd"] = {d.attribute_key: d.mvd_impact_score for d in drivers}
                 say("MVD blueprint: " + ", ".join(f"{d.attribute_key}={d.mvd_impact_score:.2f}" for d in sorted(drivers, key=lambda d: -d.mvd_impact_score)[:6]) + " …")
 
@@ -200,10 +202,15 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
             with session_scope() as s:
                 ind_o = s.get(Indication, ind_id)
                 assets_o = s.execute(select(Asset).where(Asset.id.in_(asset_ids))).scalars().all()
-                g = await ingest_guidelines(s, ind_o, assets_o, force_refresh=force, say=say)
+                g = await ingest_guidelines(s, ind_o, assets_o, max_docs=request.get("max_guideline_docs"), force_refresh=force, say=say)
                 summary["guidelines"] = g
                 say(f"Guidelines: {g['recommendations']} positioning statements extracted from {g['documents_mentioning_assets']} documents")
 
+        summary["llm_usage"] = llm_base.usage_snapshot()
+        u = summary["llm_usage"]
+        if u["calls"] or u["cache_hits"] or u["failed"]:
+            say(f"LLM usage: {u['calls']} requests sent ({u['cache_hits']} answered from cache), ~{u['approx_input_tokens']:,} input tokens, "
+                f"{u['rate_limited']} rate-limit waits, {u['failed']} extractions given up")
         with aux_scope() as s:
             job = s.get(IngestJob, job_id)
             job.status = "done"
@@ -215,6 +222,7 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
         tb = traceback.format_exc()
         log.error(tb)
         say(f"ERROR: {exc}")
+        summary["llm_usage"] = llm_base.usage_snapshot()
         with aux_scope() as s:
             job = s.get(IngestJob, job_id)
             job.status = "error"

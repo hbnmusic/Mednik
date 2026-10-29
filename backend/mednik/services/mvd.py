@@ -28,6 +28,7 @@ from typing import Any, Callable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..models import Document, DocumentLink, Indication, MarketValueDriver
 from ..taxonomy import MVD_BY_KEY, PERSONAS, mvd_profile
 from ..textutil import split_sentences
@@ -114,7 +115,8 @@ def guideline_component(docs: list[Document], profile: tuple[str, ...]) -> tuple
     return {k: hits[k] / len(docs) for k in profile}, quotes
 
 
-async def compute_mvds(session: Session, indication: Indication, *, say: Callable[[str], None] = log.info) -> list[MarketValueDriver]:
+async def compute_mvds(session: Session, indication: Indication, *, say: Callable[[str], None] = log.info,
+                       max_docs: int | None = None) -> list[MarketValueDriver]:
     profile = mvd_profile(indication.key)
     pref_docs = session.execute(select(Document).join(DocumentLink).where(
         DocumentLink.indication_id == indication.id, DocumentLink.role == "mvd_preference")).scalars().unique().all()
@@ -124,7 +126,11 @@ async def compute_mvds(session: Session, indication: Indication, *, say: Callabl
         r"preference|choice|conjoint|survey|attribute", f"{d.title} {d.abstract}", re.I)]
     say(f"MVD: {len(pref_docs)} preference studies, {len(guide_docs)} guideline documents for {indication.name}")
 
-    docs_in = [(d.pmid or d.source_id, doc_text(d, 30000)) for d in pref_docs[:40] if d.abstract or d.full_text]
+    # Cap the documents sent to the LLM: discrete-choice / conjoint studies first, then the newest.
+    pref_docs.sort(key=lambda d: (-len(set(d.evidence_tags_json or []) & {"DCE", "SURVEY"}), -(d.year or 0)))
+    st = get_settings()
+    cap = int(max_docs or (st.llm_max_mvd_docs if st.llm_enabled else 40))
+    docs_in = [(d.pmid or d.source_id, doc_text(d, 30000)) for d in pref_docs[:cap] if d.abstract or d.full_text]
     llm_used = get_provider() is not None
     attrs = await extract_mvd_preferences(docs_in, indication.key, indication.name) if docs_in else []
     by_study: dict[str, list[dict[str, Any]]] = defaultdict(list)

@@ -23,6 +23,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ..clients import EuropePmcClient
+from ..config import get_settings
 from ..models import Asset, Document, DocumentLink, GuidelineRecommendation, Indication
 from ..taxonomy import INDICATION_BY_KEY, asset_terms, column_label, text_mentions_asset
 from ..textutil import clean_ws
@@ -80,14 +81,15 @@ def jats_to_text(xml: str) -> str:
     return "\n".join(p for p in parts if p)
 
 
-async def ingest_guidelines(session: Session, indication: Indication, assets: list[Asset], *, max_docs: int = 12,
+async def ingest_guidelines(session: Session, indication: Indication, assets: list[Asset], *, max_docs: int | None = None,
                             force_refresh: bool = False, say: Callable[[str], None] = log.info) -> dict[str, Any]:
     corpus = await search_corpus(guideline_pubmed_term(indication.name), guideline_epmc_query(indication.name), max_pubmed=60, max_epmc=60,
                                  force_refresh=force_refresh, say=say)
     docs = store_corpus(session, corpus, "guideline", None, indication.id)
     docs = [d for d in docs if set(d.evidence_tags_json or []) & {"GUIDELINE", "CONSENSUS", "GUIDELINE_LIKE"}]
     docs.sort(key=lambda d: (-(d.year or 0)))
-    docs = docs[:max_docs]
+    st = get_settings()  # the cap exists to limit LLM quota; the lexical fallback costs nothing, so it keeps the wider net
+    docs = docs[: int(max_docs or (st.llm_max_guideline_docs if st.llm_enabled else 12))]
     ep = EuropePmcClient()
     n_full = 0
     for d in docs:

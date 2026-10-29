@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 from typing import Any
 
+from . import base as llm_base
 from .base import LlmError, LlmProvider, http, parse_json_text
 
 API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -37,6 +38,7 @@ def to_openapi_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
 class GeminiProvider(LlmProvider):
     name = "gemini"
+    _thinking_ok = True
 
     @property
     def model(self) -> str:
@@ -67,13 +69,31 @@ class GeminiProvider(LlmProvider):
                 body["generationConfig"][field] = sch
             else:
                 body["contents"][0]["parts"][0]["text"] = f"{prompt}\n\nReturn ONLY a JSON object matching this JSON Schema:\n{schema}"
+            level = self.settings.gemini_thinking_level
+            if level and self._thinking_ok:
+                body["generationConfig"]["thinkingConfig"] = {"thinkingLevel": level}
             try:
                 data = await self._post(body)
             except LlmError as exc:
                 last = exc
                 if str(exc).startswith("400"):
-                    continue  # schema dialect not accepted by this model → try next form
-                raise
+                    if "thinking" in str(exc).lower() and self._thinking_ok:
+                        self._thinking_ok = False  # this model rejects the setting: drop it for the rest of the run
+                        try:
+                            body["generationConfig"].pop("thinkingConfig", None)
+                            data = await self._post(body)
+                        except LlmError as exc2:
+                            last = exc2
+                            if str(exc2).startswith("400"):
+                                continue
+                            raise
+                    else:
+                        continue  # schema dialect not accepted by this model → try next form
+                else:
+                    raise
+            um = data.get("usageMetadata") or {}
+            llm_base.USAGE.prompt_tokens += int(um.get("promptTokenCount") or 0)
+            llm_base.USAGE.output_tokens += int(um.get("candidatesTokenCount") or 0) + int(um.get("thoughtsTokenCount") or 0)
             cands = data.get("candidates") or []
             if not cands:
                 raise LlmError(f"gemini returned no candidates: {str(data)[:300]}")

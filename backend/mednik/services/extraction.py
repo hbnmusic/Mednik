@@ -13,6 +13,7 @@ shapes (with the matched sentence as the quote).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from typing import Any
@@ -21,6 +22,7 @@ from ..db import aux_scope
 from ..models import ExtractionAudit
 from ..taxonomy import MVD_BY_KEY, classify_scale, map_text_to_mvd, mvd_profile
 from ..textutil import normalize_text, parse_number, parse_p_value, split_sentences
+from .llm import base as llm_base
 from .llm.base import LlmError, LlmProvider, get_provider
 
 log = logging.getLogger("mednik.extraction")
@@ -238,6 +240,7 @@ async def _run(provider: LlmProvider, prompt: str, schema: dict, name: str) -> d
         return await provider.generate_json(SYSTEM_PROMPT, prompt, schema, name)
     except (LlmError, ValueError) as exc:
         log.warning("LLM extraction failed (%s): %s", name, exc)
+        llm_base.USAGE.failed += 1
         return {}
 
 
@@ -261,7 +264,7 @@ async def extract_endpoints(docs: list[tuple[str, str]], asset_terms: list[str],
         size += len(d[1])
     if batch:
         batches.append(batch)
-    for b in batches:
+    async def one_batch(b: list[tuple[str, str]]) -> list[dict[str, Any]]:
         prompt = (
             f"Asset of interest: {', '.join(asset_terms)}. Indication context: {indication_label}.\n"
             "Extract every quantitative efficacy or safety result comparing the asset of interest with placebo or an active "
@@ -271,7 +274,10 @@ async def extract_endpoints(docs: list[tuple[str, str]], asset_terms: list[str],
             + _docs_block(b)
         )
         out = await _run(provider, prompt, ENDPOINT_SCHEMA, "endpoint_extraction")
-        items += out.get("items") or []
+        return out.get("items") or []
+
+    for part in await asyncio.gather(*(one_batch(b) for b in batches)):  # the provider's semaphore bounds concurrency
+        items += part
     return validate_items(items, sources, numeric_fields=("value", "comparator_value", "ci_95_lower", "ci_95_upper", "n_treatment", "n_comparator"),
                           context_numeric_fields=("timepoint_weeks",), schema_name="endpoint_extraction",
                           provider=provider.name, require_value="value")
@@ -286,7 +292,8 @@ async def extract_mvd_preferences(docs: list[tuple[str, str]], indication_key: s
     profile = mvd_profile(indication_key)
     guide = "\n".join(f"- {k}: {MVD_BY_KEY[k].name}" for k in profile)
     results: list[dict[str, Any]] = []
-    for sid, text in docs:
+
+    async def one_doc(sid: str, text: str) -> list[dict[str, Any]]:
         prompt = (
             f"Indication: {indication_label}. Identify treatment attributes that clinicians (or patients) value when choosing "
             "a treatment, as reported in this study (discrete choice experiment, conjoint, best-worst scaling, survey, or "
@@ -301,8 +308,11 @@ async def extract_mvd_preferences(docs: list[tuple[str, str]], indication_key: s
             a["_study_design"] = out.get("study_design")
             a["_n_respondents"] = out.get("n_respondents")
             a["_respondent_type"] = out.get("respondent_type")
-        results += validate_items(attrs, sources, numeric_fields=("importance_value",), schema_name="mvd_preference_extraction",
-                                  provider=provider.name)
+        return validate_items(attrs, sources, numeric_fields=("importance_value",), schema_name="mvd_preference_extraction",
+                              provider=provider.name)
+
+    for part in await asyncio.gather(*(one_doc(sid, text) for sid, text in docs)):
+        results += part
     for r in results:
         if r.get("canonical_attribute") == "OTHER" or r.get("canonical_attribute") not in profile:
             r["canonical_attribute"] = map_text_to_mvd(r.get("attribute_text", ""), indication_key) or "OTHER"
@@ -317,7 +327,8 @@ async def extract_guideline_recs(docs: list[tuple[str, str]], asset_terms_by_ass
         return lexical_guideline_recs(docs, asset_terms_by_asset)
     names = "; ".join(f"{k} ({', '.join(v)})" for k, v in asset_terms_by_asset.items())
     results: list[dict[str, Any]] = []
-    for sid, text in docs:
+
+    async def one_doc(sid: str, text: str) -> list[dict[str, Any]]:
         prompt = (
             f"Indication: {indication_label}. Assets of interest: {names}.\n"
             "For each asset of interest that this guideline / consensus document explicitly positions, record the recommendation "
@@ -331,7 +342,10 @@ async def extract_guideline_recs(docs: list[tuple[str, str]], asset_terms_by_ass
             r.setdefault("source_id", sid)
             r["_guideline_body"] = out.get("guideline_body")
             r["_publication_year"] = out.get("publication_year")
-        results += validate_items(recs, sources, numeric_fields=(), schema_name="guideline_extraction", provider=provider.name)
+        return validate_items(recs, sources, numeric_fields=(), schema_name="guideline_extraction", provider=provider.name)
+
+    for part in await asyncio.gather(*(one_doc(sid, text) for sid, text in docs)):
+        results += part
     return results
 
 

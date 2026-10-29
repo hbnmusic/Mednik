@@ -94,6 +94,12 @@ def main() -> int:
         rep.check("Ingest job completed", job["status"] == "done", job.get("error") or f"{time.time() - t0:.0f}s")
         if job["status"] != "done":
             return finish(rep, out)
+        u = (job["summary"] or {}).get("llm_usage") or {}
+        if h.get("llm_enabled"):
+            rep.check("Gemini usage for the sync", u.get("failed", 0) == 0,
+                      f"{u.get('calls', 0)} requests sent, {u.get('cache_hits', 0)} from cache, ~{u.get('approx_input_tokens', 0):,} input tokens, "
+                      f"{u.get('output_tokens', 0):,} output tokens, {u.get('rate_limited', 0)} rate-limit waits, {u.get('failed', 0)} extractions given up",
+                      hard=False)
 
         # 1. USPI §7 CYP3A4
         for a in assets:

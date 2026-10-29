@@ -175,7 +175,9 @@ class IngestIn(BaseModel):
     include_guidelines: bool = True
     max_trials: int | None = None
     max_pubs: int | None = None
-    max_extract_docs: int | None = 40
+    max_extract_docs: int | None = Field(None, description="LLM documents per asset (default MEDNIK_LLM_MAX_ASSET_DOCS)")
+    max_mvd_docs: int | None = Field(None, description="preference studies sent to the LLM (default MEDNIK_LLM_MAX_MVD_DOCS)")
+    max_guideline_docs: int | None = Field(None, description="guideline documents sent to the LLM (default MEDNIK_LLM_MAX_GUIDELINE_DOCS)")
 
 
 @app.post("/api/v1/ingest")

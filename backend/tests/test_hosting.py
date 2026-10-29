@@ -109,3 +109,53 @@ def test_normalize_url():
     assert normalize_url("postgres://u:p@h:5432/db") == "postgresql+psycopg://u:p@h:5432/db"
     assert normalize_url("postgresql://u:p@h/db") == "postgresql+psycopg://u:p@h/db"
     assert normalize_url("sqlite:///x.db") == "sqlite:///x.db"
+
+
+# ---- LLM usage accounting and quota-aware retries ----------------------------------------------------------------
+
+
+def test_retry_delay_honours_google_hint_and_backs_off():
+    from mednik.services.llm.base import retry_delay
+
+    quota = '429 {"error":{"status":"RESOURCE_EXHAUSTED","details":[{"retryDelay":"23s"}]}}'
+    assert retry_delay(quota, 0) == 24.0
+    assert retry_delay("429 rate limited", 0) == 5.0 and retry_delay("429 rate limited", 3) == 40.0
+    assert retry_delay("429 rate limited", 6) == 60.0  # capped
+    assert retry_delay("503 unavailable", 2) == 8.0  # ordinary server errors keep the short back-off
+
+
+def test_llm_usage_counts_calls_cache_hits_and_failures(monkeypatch):
+    import asyncio
+
+    from mednik.config import Settings
+    from mednik.services.extraction import extract_guideline_recs
+    from mednik.services.llm import base as llm_base
+
+    class Fake(llm_base.LlmProvider):
+        name = "fake"
+        n = 0
+
+        @property
+        def model(self):
+            return "fake-1"
+
+        async def _call(self, system, prompt, schema, schema_name):
+            Fake.n += 1
+            if "DOC_B" in prompt:
+                raise llm_base.LlmError("400 bad request")  # not retryable → counted as a failed extraction
+            return {"recommendations": [], "guideline_body": None, "publication_year": None}
+
+    async def instant(_):
+        return None
+
+    monkeypatch.setattr(llm_base.asyncio, "sleep", instant)
+    prov = Fake(Settings(llm_max_concurrency=2))
+    docs = [("a", "DOC_A text"), ("b", "DOC_B text")]
+    llm_base.reset_usage()
+    asyncio.run(extract_guideline_recs(docs, {"x": ["x"]}, "Schizophrenia", provider=prov))
+    u = llm_base.usage_snapshot()
+    assert (u["calls"], u["failed"], u["cache_hits"]) == (1, 1, 0)
+    asyncio.run(extract_guideline_recs(docs[:1], {"x": ["x"]}, "Schizophrenia", provider=prov))  # same prompt → cached
+    u = llm_base.usage_snapshot()
+    assert u["cache_hits"] == 1 and u["calls"] == 1 and Fake.n == 2
+    assert u["approx_input_tokens"] > 0

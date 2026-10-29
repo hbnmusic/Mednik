@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # --- LLM structured extraction --------------------------------------------
     llm_provider: Literal["gemini", "anthropic", "openai_compat", "none"] = "gemini"
     llm_max_concurrency: int = 4
+    # Per-sync caps on documents sent to the LLM (each document is one call, or a share of one for short abstracts).
+    llm_max_asset_docs: int = 25  # per asset, literature extraction (was 40)
+    llm_max_mvd_docs: int = 20  # preference studies for the value-driver blueprint (was 40)
+    llm_max_guideline_docs: int = 8  # most recent guideline / consensus documents (was 12)
+    gemini_thinking_level: str = "low"  # Gemini 3.x reasoning effort for extraction ("" = model default)
     gemini_api_key: str | None = Field(
         default=None, validation_alias=AliasChoices("MEDNIK_GEMINI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")
     )
