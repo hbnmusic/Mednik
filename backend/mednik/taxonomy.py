@@ -476,4 +476,4 @@ def column_label(col: str) -> str:
     if ck.adjunctive:
         parts.append("Adjunctive")
     parts.append(TIMEPOINT_LABELS.get(ck.timepoint, ck.timepoint))
-    return " · ".join(parts)
+    return ", ".join(parts)

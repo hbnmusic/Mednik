@@ -145,7 +145,7 @@ def build_heatmap(session: Session, asset: Asset, *, indication_keys: list[str] 
             if eff:
                 summary = f"d {eff['estimate']:+.2f} (k={eff['k_studies']})"
             elif risk:
-                summary = f"{risk['pp']:+.1f} pp vs PBO" + (f" · NNH {risk['nnh']:.0f}" if risk.get("nnh") else "")
+                summary = f"{risk['pp']:+.1f} pp vs PBO" + (f", NNH {risk['nnh']:.0f}" if risk.get("nnh") else "")
             else:
                 best = max(cp, key=lambda p: (p[0].validity_level or 0))[0]
                 unit = {"LS_MEAN_DIFF": "LSΔ", "HR": "HR", "OR": "OR", "NNT": "NNT", "NNH": "NNH", "INCIDENCE_PCT": "%", "RD": "RD",

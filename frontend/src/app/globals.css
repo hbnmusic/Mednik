@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   mednik tokens
+   Chrome stays quiet graphite/paper so evidence semantics (effect greens,
+   harm ambers/reds, hatched white space) carry the colour.
+--------------------------------------------------------------------------- */
+:root {
+  color-scheme: light;
+  --page: #eef0f3;
+  --panel: #ffffff;
+  --raised: #f6f7f9;
+  --sunken: #e6e9ee;
+  --line: #d9dde3;
+  --line-strong: #c3c9d1;
+  --ink: #13161b;
+  --ink-2: #474e59;
+  --ink-3: #6c7480;
+  --accent: #4f46c8;
+  --accent-wash: rgba(79, 70, 200, 0.09);
+  --focus: #4f46c8;
+  --on-accent: #ffffff;
+
+  /* categorical (validated: dataviz reference slots 1–4) */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+
+  /* evidence semantics */
+  --fav-1: #dcefdc;
+  --fav-2: #a9d9aa;
+  --fav-3: #5fb763;
+  --fav-ink: #0d3b12;
+  --neutral-cell: #e9ebef;
+  --harm-1: #fbe9b7;
+  --harm-2: #f6c49f;
+  --harm-3: #e78787;
+  --harm-ink: #4a1a08;
+  --unfav: #d9b8e8;
+  --hatch-a: #f2f3f6;
+  --hatch-b: #dfe3e9;
+
+  --good: #0ca30c;
+  --warning: #fab219;
+  --serious: #ec835a;
+  --critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #15181d;
+    --panel: #1c2026;
+    --raised: #232830;
+    --sunken: #181b20;
+    --line: #2e343d;
+    --line-strong: #3d4550;
+    --ink: #e6e9ee;
+    --ink-2: #aab1bc;
+    --ink-3: #7d8592;
+    --accent: #9b93f5;
+    --accent-wash: rgba(155, 147, 245, 0.12);
+    --focus: #9b93f5;
+    --on-accent: #16142a;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --fav-1: #1f3524;
+    --fav-2: #2b5c33;
+    --fav-3: #3e8a47;
+    --fav-ink: #e4f5e4;
+    --neutral-cell: #262b33;
+    --harm-1: #4a3a12;
+    --harm-2: #6a3a1f;
+    --harm-3: #7d2a2a;
+    --harm-ink: #fde9dc;
+    --unfav: #4b3157;
+    --hatch-a: #1c2026;
+    --hatch-b: #2a3038;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #15181d;
+  --panel: #1c2026;
+  --raised: #232830;
+  --sunken: #181b20;
+  --line: #2e343d;
+  --line-strong: #3d4550;
+  --ink: #e6e9ee;
+  --ink-2: #aab1bc;
+  --ink-3: #7d8592;
+  --accent: #9b93f5;
+  --accent-wash: rgba(155, 147, 245, 0.12);
+  --focus: #9b93f5;
+  --on-accent: #16142a;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --fav-1: #1f3524;
+  --fav-2: #2b5c33;
+  --fav-3: #3e8a47;
+  --fav-ink: #e4f5e4;
+  --neutral-cell: #262b33;
+  --harm-1: #4a3a12;
+  --harm-2: #6a3a1f;
+  --harm-3: #7d2a2a;
+  --harm-ink: #fde9dc;
+  --unfav: #4b3157;
+  --hatch-a: #1c2026;
+  --hatch-b: #2a3038;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-wash: var(--accent-wash);
+  --color-on-accent: var(--on-accent);
+  --color-good: var(--good);
+  --color-warning: var(--warning);
+  --color-serious: var(--serious);
+  --color-critical: var(--critical);
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-cond: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 18px;
+  --text-base: 14px;
+  --text-base--line-height: 20px;
+  --text-lg: 16px;
+  --text-lg--line-height: 22px;
+  --text-xl: 19px;
+  --text-xl--line-height: 26px;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* evidence white space: diagonal hatch (texture channel doubles as the CVD/print cue) */
+.hatch {
+  background-image: repeating-linear-gradient(135deg, var(--hatch-a) 0 5px, var(--hatch-b) 5px 6px);
+}
+
+.quote {
+  border-left: 2px solid var(--line-strong);
+  padding-left: 10px;
+  color: var(--ink-2);
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .hatch {
+    forced-color-adjust: none;
+  }
+}

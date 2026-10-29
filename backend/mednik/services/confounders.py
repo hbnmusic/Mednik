@@ -48,7 +48,18 @@ def _placebo_change(studies: list[ClinicalStudy], scale: str | None) -> float | 
 
 
 def _ref(s: ClinicalStudy) -> str:
-    return s.nct_id or s.pmid or s.source_ref
+    if s.nct_id or s.pmid:
+        return s.nct_id or s.pmid
+    if s.source == "uspi":
+        return "USPI §14 " + s.source_ref.rsplit(":", 1)[-1]
+    return s.source_ref
+
+
+ARCHETYPE_LABEL = {
+    "ACUTE_PARALLEL_PLACEBO": "acute parallel, placebo-controlled", "LONG_TERM_PARALLEL_PLACEBO": "long-term parallel, placebo-controlled",
+    "RANDOMIZED_WITHDRAWAL": "randomized withdrawal", "OPEN_LABEL_SINGLE_ARM": "open-label single arm", "CROSSOVER": "crossover",
+    "PARALLEL_ACTIVE": "parallel, active-controlled", "OBSERVATIONAL": "observational", "OTHER": "other",
+}
 
 
 def compare_designs(asset_a: str, asset_b: str, studies_a: list[ClinicalStudy], studies_b: list[ClinicalStudy],
@@ -73,7 +84,8 @@ def compare_designs(asset_a: str, asset_b: str, studies_a: list[ClinicalStudy], 
     norm = lambda xs: {("ACUTE_PARALLEL_PLACEBO" if x == "LABEL_PIVOTAL" else x) for x in xs if x not in ("LABEL_POOLED_SAFETY",)}  # noqa: E731
     if arch_a and arch_b:
         diverge = norm(arch_a) != norm(arch_b)
-        items.append({"dimension": "Trial architecture", "a": ", ".join(arch_a), "b": ", ".join(arch_b), "metric": None,
+        items.append({"dimension": "Trial architecture", "a": "; ".join(sorted({ARCHETYPE_LABEL.get(x, x) for x in norm(arch_a)})),
+                      "b": "; ".join(sorted({ARCHETYPE_LABEL.get(x, x) for x in norm(arch_b)})), "metric": None,
                       "threshold": "different design archetypes", "triggered": diverge,
                       "caveat": "Designs differ (e.g. acute parallel-group vs randomized withdrawal); enriched or withdrawal designs are not comparable to acute placebo-controlled effects."})
 
