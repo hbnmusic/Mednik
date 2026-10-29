@@ -223,17 +223,17 @@ def main() -> int:
         rep.check("Citation validator active", audit["accepted"] + audit["rejected"] > 0 or args.skip_literature,
                   f"{audit['accepted']} accepted / {audit['rejected']} rejected extractions", hard=False)
         dossier = c.get("/api/v1/export/dossier", params={"indication": args.indication, "asset_a": a_name, "comparators": comps})
-        (ROOT / "verification_dossier.md").write_text(dossier.text)
+        (ROOT / "verification_dossier.md").write_text(dossier.text, encoding="utf-8")
         rep.check("Dossier export", dossier.status_code == 200 and bool(NCT.search(dossier.text)), "backend/verification_dossier.md")
     return finish(rep, out)
 
 
 def finish(rep: Report, out: dict) -> int:
     out["checks"] = rep.rows
-    (ROOT / "verification_report.json").write_text(json.dumps(out, indent=2, default=str))
+    (ROOT / "verification_report.json").write_text(json.dumps(out, indent=2, default=str), encoding="utf-8")
     md = ["# mednik — live verification report", "", "| Status | Check | Detail |", "|---|---|---|"]
     md += [f"| {r['status']} | {r['check']} | {r['detail'].replace('|', '/')[:400]} |" for r in rep.rows]
-    (ROOT / "verification_report.md").write_text("\n".join(md))
+    (ROOT / "verification_report.md").write_text("\n".join(md), encoding="utf-8")
     n_fail = sum(r["status"] == "FAIL" for r in rep.rows)
     n_warn = sum(r["status"] == "WARN" for r in rep.rows)
     print(f"\n{len(rep.rows) - n_fail - n_warn} passed, {n_warn} warnings, {n_fail} failed → backend/verification_report.md")

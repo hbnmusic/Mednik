@@ -25,9 +25,13 @@ VENV_PY = BACKEND / ".venv" / ("Scripts/python.exe" if WIN else "bin/python")
 NPM = "npm.cmd" if WIN else "npm"
 
 
+# UTF-8 everywhere (Windows consoles / redirected output default to cp1252)
+ENV = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+
+
 def run(cmd: list[str], cwd: Path) -> None:
     print(f"$ {' '.join(cmd)}  (in {cwd.name})", flush=True)
-    subprocess.run(cmd, cwd=cwd, check=True)
+    subprocess.run(cmd, cwd=cwd, check=True, env=ENV)
 
 
 def check_versions() -> None:
@@ -59,8 +63,8 @@ def dev() -> None:
     if not VENV_PY.exists():
         sys.exit("Run `python mednik.py setup` first.")
     procs = [
-        subprocess.Popen([str(VENV_PY), "-m", "uvicorn", "mednik.api.main:app", "--port", "8000", "--reload"], cwd=BACKEND),
-        subprocess.Popen([NPM, "run", "dev", "--", "-p", "3000"], cwd=FRONTEND),
+        subprocess.Popen([str(VENV_PY), "-m", "uvicorn", "mednik.api.main:app", "--port", "8000", "--reload"], cwd=BACKEND, env=ENV),
+        subprocess.Popen([NPM, "run", "dev", "--", "-p", "3000"], cwd=FRONTEND, env=ENV),
     ]
     print("\nmednik API → http://localhost:8000/docs   dashboard → http://localhost:3000   (Ctrl+C to stop)\n", flush=True)
     try:
