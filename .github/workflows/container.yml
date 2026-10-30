@@ -59,6 +59,29 @@ jobs:
           echo "Idle memory: $(docker stats --no-stream --format '{{.MemUsage}}' mednik)" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Image size: $(docker image inspect mednik:ci --format '{{.Size}}' | awk '{printf "%.0f MB", $1/1048576}')" | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Six-asset depression sync inside the 512 MB container (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        timeout-minutes: 25
+        run: |
+          jar=$(mktemp)
+          curl -fs -c "$jar" -o /dev/null -d 'password=ci-password&next=/' localhost:10000/login
+          body='{"indication":"Major Depressive Disorder (adjunct)","assets":[{"generic":"lumateperone","brand":"Caplyta"},{"generic":"cariprazine","brand":"Vraylar"},{"generic":"quetiapine","brand":"Seroquel"},{"generic":"bupropion","brand":"Wellbutrin"},{"generic":"aripiprazole","brand":"Abilify"},{"generic":"brexpiprazole","brand":"Rexulti"}]}'
+          job=$(curl -fs -b "$jar" -H 'Content-Type: application/json' -d "$body" localhost:10000/api/v1/ingest | python3 -c 'import json,sys; print(json.load(sys.stdin)["job_id"])')
+          echo "job $job"
+          status=running
+          for i in $(seq 1 150); do
+            status=$(curl -fs -b "$jar" localhost:10000/api/v1/jobs/$job | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])') || status=unreachable
+            [ "$status" != running ] && [ "$status" != queued ] && break
+            echo "$(date +%T) $status — $(docker stats --no-stream --format '{{.MemUsage}}' mednik)"
+            sleep 10
+          done
+          curl -fs -b "$jar" localhost:10000/api/v1/jobs/$job | python3 -c 'import json,sys; j=json.load(sys.stdin); print("\n".join(str(l) for l in j["log"][-40:])); print("error:", j["error"])' || true
+          oom=$(docker inspect mednik --format '{{.State.OOMKilled}} restarts={{.RestartCount}}')
+          echo "OOMKilled: $oom" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Sync status: $status" | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$status" = done
+          case "$oom" in false*) ;; *) exit 1;; esac
+
       - name: Container log
         if: always()
         run: docker logs mednik 2>&1 | tail -50

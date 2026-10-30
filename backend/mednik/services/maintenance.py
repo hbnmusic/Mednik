@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -64,3 +65,26 @@ def mark_interrupted_jobs() -> int:
     if n:
         log.info("Marked %d interrupted ingest job(s)", n)
     return n
+
+
+def rss_mb() -> float | None:
+    """Resident memory of this process in MB (Linux only), for the sync log on small hosts."""
+    try:
+        with open("/proc/self/status") as f:
+            for line in f:
+                if line.startswith("VmRSS:"):
+                    return round(int(line.split()[1]) / 1024, 0)
+    except OSError:
+        return None
+    return None
+
+
+def tidy_between_assets() -> str:
+    """Free memory and trim the raw-response cache between assets; returns a short note for the job log."""
+    try:
+        purge_api_cache()
+    except Exception:  # noqa: BLE001
+        log.warning("cache purge between assets failed", exc_info=True)
+    gc.collect()
+    mb = rss_mb()
+    return f"memory {int(mb)} MB" if mb else ""

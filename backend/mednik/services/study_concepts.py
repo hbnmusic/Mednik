@@ -111,7 +111,7 @@ async def generate_study_concept(session: Session, asset: Asset, row_key: str, c
     ind_label = indication_label(ck.indication_key)
     cond = re.sub(r"\s*\(.*?\)|\s*/.*$", "", ind_label).replace("Bipolar I ", "Bipolar ")
     client = ClinicalTrialsClient()
-    raw: dict[str, dict[str, Any]] = {}
+    parsed: dict[str, tuple[dict[str, Any], list[str]]] = {}  # nct -> (parsed metadata, intervention names); raw records are dropped page by page
     comp_terms: list[str] = []
     for c in competitors:
         comp_terms += asset_terms(c.generic_name, c.brand_name, c.synonyms_json)
@@ -121,19 +121,20 @@ async def generate_study_concept(session: Session, asset: Asset, row_key: str, c
     queries.append({"condition": cond, "term": SCALE_SEARCH_TERMS.get(row_key, sdef.label), "max_studies": 150})
     for q in queries:
         try:
-            for st in await client.search_studies(force_refresh=force_refresh, **q):
-                nct = st.get("protocolSection", {}).get("identificationModule", {}).get("nctId")
-                if nct:
-                    raw[nct] = st
+            async for page in client.iter_study_pages(force_refresh=force_refresh, **q):
+                for st in page:
+                    nct = st.get("protocolSection", {}).get("identificationModule", {}).get("nctId")
+                    if nct:
+                        ivs = sorted({i.get("name") for i in st.get("protocolSection", {}).get("armsInterventionsModule", {}).get("interventions", []) or []
+                                      if i.get("name")})
+                        parsed[nct] = (parse_ctgov_study(st, []), ivs)
         except Exception as exc:  # noqa: BLE001
             log.warning("precedent query failed: %s", exc)
     precedents = []
-    for nct, st in raw.items():
-        meta = parse_ctgov_study(st, [])
+    for nct, (meta, ivs) in parsed.items():
         outs = [o for o in meta["registered_outcomes"]["primary"] + meta["registered_outcomes"]["secondary"] if o.get("scale") == row_key]
         if not outs:
             continue
-        ivs = sorted({i.get("name") for i in st.get("protocolSection", {}).get("armsInterventionsModule", {}).get("interventions", []) or [] if i.get("name")})
         is_comp = any(t.lower() in " ".join(ivs).lower() for t in comp_terms)
         precedents.append({**meta, "matched_outcomes": outs, "interventions": ivs, "is_competitor_trial": is_comp})
     precedents.sort(key=lambda p: (not p["is_competitor_trial"], -(p["phase_max"] or 0), -(p["sample_size"] or 0)))

@@ -125,7 +125,7 @@ def main() -> int:
         # 2. CT.gov sponsor split
         from sqlalchemy import select
 
-        from mednik.clients.base import BaseApiClient  # noqa: F401
+        from mednik.clients.base import BaseApiClient, decode_cache_body  # noqa: F401
         from mednik.db import aux_scope
         from mednik.models import ApiCache
 
@@ -133,7 +133,7 @@ def main() -> int:
         with aux_scope() as s:
             for row in s.execute(select(ApiCache).where(ApiCache.source == "ctgov")).scalars().all():
                 try:
-                    for st in json.loads(row.body).get("studies", []):
+                    for st in json.loads(decode_cache_body(row.body)).get("studies", []):
                         ps = st.get("protocolSection", {})
                         raw_class[ps.get("identificationModule", {}).get("nctId")] = ps.get("sponsorCollaboratorsModule", {}).get("leadSponsor", {}).get("class")
                 except Exception:  # noqa: BLE001

@@ -8,11 +8,13 @@ first sync (spec §1, rate-limiting / offline-resilience exception).
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import logging
 import random
 import time
+import zlib
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -87,6 +89,24 @@ class RateLimiter:
             self._last = time.monotonic()
 
 
+_Z_PREFIX = "~mednik-z1~"
+_Z_MIN_CHARS = 20_000
+
+
+def encode_cache_body(text: str) -> str:
+    """Large payloads (registry pages with results run to megabytes) are stored deflated + base64 (≈8× smaller),
+    which keeps a free-tier database far below its size limit. Small bodies stay plain text."""
+    if len(text) < _Z_MIN_CHARS:
+        return text
+    return _Z_PREFIX + base64.b64encode(zlib.compress(text.encode("utf-8"), 6)).decode("ascii")
+
+
+def decode_cache_body(body: str) -> str:
+    if body.startswith(_Z_PREFIX):
+        return zlib.decompress(base64.b64decode(body[len(_Z_PREFIX):])).decode("utf-8")
+    return body
+
+
 def cache_key(source: str, url: str, params: dict[str, Any] | None, body: Any | None = None) -> str:
     payload = json.dumps({"s": source, "u": url, "p": sorted((params or {}).items()), "b": body}, default=str, sort_keys=True)
     return hashlib.sha256(payload.encode()).hexdigest()
@@ -112,17 +132,17 @@ class BaseApiClient:
             fetched = row.fetched_at if row.fetched_at.tzinfo else row.fetched_at.replace(tzinfo=timezone.utc)
             if datetime.now(timezone.utc) - fetched > ttl:
                 return None
-            return ApiResponse(self.source, row.url, row.status_code, row.body, row.content_type, True)
+            return ApiResponse(self.source, row.url, row.status_code, decode_cache_body(row.body), row.content_type, True)
 
     def _cache_put(self, key: str, url: str, params: dict | None, resp: ApiResponse) -> None:
         with aux_scope() as s:
             row = s.execute(select(ApiCache).where(ApiCache.cache_key == key)).scalar_one_or_none()
             if row is None:
                 row = ApiCache(cache_key=key, source=self.source, url=url, params_json=params or {},
-                               status_code=resp.status, content_type=resp.content_type, body=resp.text)
+                               status_code=resp.status, content_type=resp.content_type, body=encode_cache_body(resp.text))
                 s.add(row)
             else:
-                row.status_code, row.body, row.content_type = resp.status, resp.text, resp.content_type
+                row.status_code, row.body, row.content_type = resp.status, encode_cache_body(resp.text), resp.content_type
                 row.fetched_at = datetime.now(timezone.utc)
 
     def cached_only(self, url: str, params: dict | None = None) -> ApiResponse | None:

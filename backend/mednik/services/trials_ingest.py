@@ -537,69 +537,73 @@ async def ingest_trials_for_asset(session: Session, asset: Asset, terms: list[st
                                   indication_by_key: dict[str, Indication], *, max_trials: int, force_refresh: bool = False,
                                   say: Callable[[str], None] = log.info) -> dict[str, Any]:
     client = ClinicalTrialsClient()
-    studies = await client.search_studies(intervention_terms=terms, max_studies=max_trials, force_refresh=force_refresh)
-    say(f"ClinicalTrials.gov: {len(studies)} registry records for {asset.generic_name}")
     session.execute(delete(ClinicalStudy).where(ClinicalStudy.asset_id == asset.id, ClinicalStudy.source == "ctgov"))
     session.flush()
     counts = Counter()
     n_endpoints = 0
-    for st in studies:
-        meta = parse_ctgov_study(st, terms, {k: v for k, v in competitor_terms.items() if k != asset.generic_name})
-        # registry search is full-text; require the asset to appear in interventions / arms / title
-        iv = " ".join([" ".join(a["interventions"]) for a in meta["arms"]] + [meta["title"] or ""] +
-                      [i.get("name", "") + " " + " ".join(i.get("otherNames") or []) for i in
-                       (st.get("protocolSection", {}).get("armsInterventionsModule", {}).get("interventions") or [])])
-        if not text_mentions_asset(iv, terms):
-            continue
-        res = parse_results(st, meta, terms) if meta["has_results"] else {"endpoints": [], "dropout": {}, "baseline": {},
-                                                                          "placebo_response": {}, "placebo_response_rate": None}
-        ind = indication_by_key.get(meta["indication_key"] or "")
-        cs = ClinicalStudy(
-            nct_id=meta["nct_id"], pmid=(meta["result_pmids"] or meta["linked_pmids"] or [None])[0], asset_id=asset.id,
-            indication_id=ind.id if ind else None, source="ctgov", source_ref=meta["nct_id"], title=meta["title"],
-            sponsor_name=meta["sponsor_name"], sponsor_class=meta["sponsor_class"], sponsor_class_raw=meta["sponsor_class_raw"],
-            industry_collaborator=meta["industry_collaborator"], phase=meta["phase"], phase_max=meta["phase_max"],
-            study_type=meta["study_type"], design_model=meta["design_model"], allocation=meta["allocation"], masking=meta["masking"],
-            design_archetype=meta["design_archetype"], placebo_run_in=meta["placebo_run_in"], flexible_dose=meta["flexible_dose"],
-            has_placebo=meta["has_placebo"], active_comparators_json=meta["active_comparators"],
-            is_head_to_head=bool(meta["head_to_head_with"]), sample_size=meta["sample_size"], duration_weeks=meta["duration_weeks"],
-            start_year=meta["start_year"], overall_status=meta["overall_status"], has_results=meta["has_results"],
-            countries_json=meta["countries"], pct_us_sites=meta["pct_us_sites"], baseline_severity_json=res["baseline"] or None,
-            placebo_response_rate=res["placebo_response_rate"], placebo_response_json=res["placebo_response"] or None,
-            dropout_json=res["dropout"] or None,
-            eligibility_json=meta["eligibility"], registered_outcomes_json={**meta["registered_outcomes"], "head_to_head_with": meta["head_to_head_with"],
-                                                                            "adjunctive": meta["adjunctive"]},
-            arms_json=meta["arms"], conditions_json=meta["conditions"], indication_key=meta["indication_key"], population=meta["population"],
-            linked_pmids_json=meta["linked_pmids"],
-        )
-        session.add(cs)
-        session.flush()
-        counts[(meta["sponsor_class"], meta["phase_max"])] += 1
-        best_t, best_v = None, 0
-        for ep in res["endpoints"]:
-            tier, _, lvl, _ = endpoint_tier_and_validity(cs, ep)
-            col = column_for(meta["indication_key"], meta["population"], meta["adjunctive"], ep.get("timepoint_weeks"))
-            sdef = SCALE_BY_KEY.get(ep["endpoint_scale_name"])
-            session.add(ExtractedEndpoint(
-                study_id=cs.id, asset_id=asset.id, indication_id=cs.indication_id, mvd_key=sdef.mvd_key if sdef else None,
-                endpoint_scale_name=ep["endpoint_scale_name"], endpoint_label=ep.get("endpoint_label"), timepoint_weeks=ep.get("timepoint_weeks"),
-                arm_name=ep.get("arm_name"), comparator_arm=ep.get("comparator_arm"), effect_size_type=ep["effect_size_type"],
-                value=ep.get("value"), ci_95_lower=ep.get("ci_95_lower"), ci_95_upper=ep.get("ci_95_upper"), p_value=ep.get("p_value"),
-                p_value_text=ep.get("p_value_text"), is_multiplicity_controlled=ep.get("is_multiplicity_controlled"),
-                is_primary=ep.get("is_primary"), is_post_hoc=ep.get("is_post_hoc"), n_treatment=ep.get("n_treatment"),
-                n_comparator=ep.get("n_comparator"), cohens_d=ep.get("cohens_d"), cohens_d_var=ep.get("cohens_d_var"),
-                risk_treatment=ep.get("risk_treatment"), risk_comparator=ep.get("risk_comparator"), risk_difference=ep.get("risk_difference"),
-                nnt_nnh=ep.get("nnt_nnh"), favorable=ep.get("favorable"), significant=ep.get("significant"), column_key=col,
-                verbatim_quote=ep["verbatim_quote"], source_id=ep["source_id"], source_type="ctgov",
-                extraction_method="deterministic_ctgov_results", evidence_tier=tier, validity_level=lvl,
-            ))
-            n_endpoints += 1
-            best_t = tier if best_t is None or ["1A", "1B", "2", "3"].index(tier) < ["1A", "1B", "2", "3"].index(best_t) else best_t
-            best_v = max(best_v, lvl)
-        if best_t is None:
-            tier, _, lvl, _ = endpoint_tier_and_validity(cs, {"is_primary": True})
-            best_t, best_v = tier, min(lvl, 4)
-        cs.evidence_tier, cs.validity_level = best_t, best_v
+    n_records = 0
+    # Registry pages are processed and dropped one at a time: records with posted results are large, and holding a
+    # few hundred of them at once is what exhausts a 512 MB host.
+    async for page in client.iter_study_pages(intervention_terms=terms, max_studies=max_trials, force_refresh=force_refresh):
+        n_records += len(page)
+        for st in page:
+            meta = parse_ctgov_study(st, terms, {k: v for k, v in competitor_terms.items() if k != asset.generic_name})
+            # registry search is full-text; require the asset to appear in interventions / arms / title
+            iv = " ".join([" ".join(a["interventions"]) for a in meta["arms"]] + [meta["title"] or ""] +
+                          [i.get("name", "") + " " + " ".join(i.get("otherNames") or []) for i in
+                           (st.get("protocolSection", {}).get("armsInterventionsModule", {}).get("interventions") or [])])
+            if not text_mentions_asset(iv, terms):
+                continue
+            res = parse_results(st, meta, terms) if meta["has_results"] else {"endpoints": [], "dropout": {}, "baseline": {},
+                                                                              "placebo_response": {}, "placebo_response_rate": None}
+            ind = indication_by_key.get(meta["indication_key"] or "")
+            cs = ClinicalStudy(
+                nct_id=meta["nct_id"], pmid=(meta["result_pmids"] or meta["linked_pmids"] or [None])[0], asset_id=asset.id,
+                indication_id=ind.id if ind else None, source="ctgov", source_ref=meta["nct_id"], title=meta["title"],
+                sponsor_name=meta["sponsor_name"], sponsor_class=meta["sponsor_class"], sponsor_class_raw=meta["sponsor_class_raw"],
+                industry_collaborator=meta["industry_collaborator"], phase=meta["phase"], phase_max=meta["phase_max"],
+                study_type=meta["study_type"], design_model=meta["design_model"], allocation=meta["allocation"], masking=meta["masking"],
+                design_archetype=meta["design_archetype"], placebo_run_in=meta["placebo_run_in"], flexible_dose=meta["flexible_dose"],
+                has_placebo=meta["has_placebo"], active_comparators_json=meta["active_comparators"],
+                is_head_to_head=bool(meta["head_to_head_with"]), sample_size=meta["sample_size"], duration_weeks=meta["duration_weeks"],
+                start_year=meta["start_year"], overall_status=meta["overall_status"], has_results=meta["has_results"],
+                countries_json=meta["countries"], pct_us_sites=meta["pct_us_sites"], baseline_severity_json=res["baseline"] or None,
+                placebo_response_rate=res["placebo_response_rate"], placebo_response_json=res["placebo_response"] or None,
+                dropout_json=res["dropout"] or None,
+                eligibility_json=meta["eligibility"], registered_outcomes_json={**meta["registered_outcomes"], "head_to_head_with": meta["head_to_head_with"],
+                                                                                "adjunctive": meta["adjunctive"]},
+                arms_json=meta["arms"], conditions_json=meta["conditions"], indication_key=meta["indication_key"], population=meta["population"],
+                linked_pmids_json=meta["linked_pmids"],
+            )
+            session.add(cs)
+            session.flush()
+            counts[(meta["sponsor_class"], meta["phase_max"])] += 1
+            best_t, best_v = None, 0
+            for ep in res["endpoints"]:
+                tier, _, lvl, _ = endpoint_tier_and_validity(cs, ep)
+                col = column_for(meta["indication_key"], meta["population"], meta["adjunctive"], ep.get("timepoint_weeks"))
+                sdef = SCALE_BY_KEY.get(ep["endpoint_scale_name"])
+                session.add(ExtractedEndpoint(
+                    study_id=cs.id, asset_id=asset.id, indication_id=cs.indication_id, mvd_key=sdef.mvd_key if sdef else None,
+                    endpoint_scale_name=ep["endpoint_scale_name"], endpoint_label=ep.get("endpoint_label"), timepoint_weeks=ep.get("timepoint_weeks"),
+                    arm_name=ep.get("arm_name"), comparator_arm=ep.get("comparator_arm"), effect_size_type=ep["effect_size_type"],
+                    value=ep.get("value"), ci_95_lower=ep.get("ci_95_lower"), ci_95_upper=ep.get("ci_95_upper"), p_value=ep.get("p_value"),
+                    p_value_text=ep.get("p_value_text"), is_multiplicity_controlled=ep.get("is_multiplicity_controlled"),
+                    is_primary=ep.get("is_primary"), is_post_hoc=ep.get("is_post_hoc"), n_treatment=ep.get("n_treatment"),
+                    n_comparator=ep.get("n_comparator"), cohens_d=ep.get("cohens_d"), cohens_d_var=ep.get("cohens_d_var"),
+                    risk_treatment=ep.get("risk_treatment"), risk_comparator=ep.get("risk_comparator"), risk_difference=ep.get("risk_difference"),
+                    nnt_nnh=ep.get("nnt_nnh"), favorable=ep.get("favorable"), significant=ep.get("significant"), column_key=col,
+                    verbatim_quote=ep["verbatim_quote"], source_id=ep["source_id"], source_type="ctgov",
+                    extraction_method="deterministic_ctgov_results", evidence_tier=tier, validity_level=lvl,
+                ))
+                n_endpoints += 1
+                best_t = tier if best_t is None or ["1A", "1B", "2", "3"].index(tier) < ["1A", "1B", "2", "3"].index(best_t) else best_t
+                best_v = max(best_v, lvl)
+            if best_t is None:
+                tier, _, lvl, _ = endpoint_tier_and_validity(cs, {"is_primary": True})
+                best_t, best_v = tier, min(lvl, 4)
+            cs.evidence_tier, cs.validity_level = best_t, best_v
+    say(f"ClinicalTrials.gov: {n_records} registry records for {asset.generic_name}")
     session.flush()
     split = {
         "industry_phase3plus": sum(v for (c, p), v in counts.items() if c == "INDUSTRY" and (p or 0) >= 3),

@@ -48,6 +48,7 @@ class Settings(BaseSettings):
 
     # --- ingestion limits ----------------------------------------------------
     max_trials_per_query: int = 300
+    ctgov_page_size: int = 40  # registry records per request; results-heavy records are large, small pages keep memory flat
     max_pubmed_per_query: int = 150
     max_epmc_per_query: int = 150
 

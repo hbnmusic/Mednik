@@ -30,6 +30,7 @@ from .literature_ingest import (
     search_corpus,
     store_corpus,
 )
+from .maintenance import tidy_between_assets
 from .mvd import compute_mvds, ingest_mvd_literature
 from .regulatory_ingest import fetch_label, persist_label
 from .trials_ingest import ingest_trials_for_asset
@@ -150,6 +151,10 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
                 n_rep = mark_replication(s, a)
                 summary["assets"].setdefault(a.generic_name, {})["trials"] = {**res, "label_linked_results": n_link, "replicated_primary_endpoints": n_rep}
                 say(f"  {a.generic_name}: {n_link} registry results matched to USPI §14; {n_rep} replicated Phase 3 primary endpoints")
+                gname = a.generic_name
+            note = tidy_between_assets()
+            if note:
+                say(f"  ({gname} done; {note})")
 
         # ---- 3. literature per asset ---------------------------------------------------
         if request.get("include_literature", True):

@@ -217,3 +217,53 @@ def test_gemini_requests_are_paced(monkeypatch):
 
     asyncio.run(go())
     assert waits == [10.0, 20.0]  # 6/min → one request every 10 s (sleep is mocked, so waits accumulate)
+
+
+# ---- memory: compressed cache bodies and page-at-a-time registry reads ----------------------------------------------
+
+
+def test_cache_body_compression_roundtrip():
+    from mednik.clients.base import decode_cache_body, encode_cache_body
+
+    small = '{"a": 1}'
+    assert encode_cache_body(small) == small and decode_cache_body(small) == small  # short bodies stay readable
+    big = '{"studies": [' + ",".join('{"nctId": "NCT%08d", "text": "' % i + "lorem ipsum " * 20 + '"}' for i in range(500)) + "]}"
+    enc = encode_cache_body(big)
+    assert len(enc) < len(big) / 3 and enc != big
+    assert decode_cache_body(enc) == big
+
+
+def test_registry_pages_are_yielded_one_at_a_time_and_trimmed(monkeypatch):
+    import asyncio
+
+    from mednik.clients import ClinicalTrialsClient
+
+    pages = [{"studies": [{"i": k} for k in range(40)], "nextPageToken": "t1"},
+             {"studies": [{"i": k} for k in range(40, 80)], "nextPageToken": "t2"},
+             {"studies": [{"i": k} for k in range(80, 120)]}]
+    calls: list[dict] = []
+
+    async def fake_get_json(self, path, params, force_refresh=False):
+        calls.append(dict(params))
+        return pages[len(calls) - 1]
+
+    monkeypatch.setattr(ClinicalTrialsClient, "get_json", fake_get_json)
+
+    async def go():
+        sizes = []
+        async for page in ClinicalTrialsClient().iter_study_pages(intervention_terms=["x"], max_studies=100):
+            sizes.append(len(page))
+        return sizes
+
+    assert asyncio.run(go()) == [40, 40, 20]  # stops at max_studies, last page trimmed
+    assert calls[0]["pageSize"] == get_settings().ctgov_page_size and calls[1]["pageToken"] == "t1"
+    calls.clear()
+    allp = asyncio.run(ClinicalTrialsClient().search_studies(intervention_terms=["x"], max_studies=100))
+    assert len(allp) == 100
+
+
+def test_rss_mb_reports_on_linux():
+    from mednik.services.maintenance import rss_mb
+
+    v = rss_mb()
+    assert v is None or v > 10
