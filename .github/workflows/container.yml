@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:16
@@ -59,8 +59,7 @@ jobs:
           echo "Idle memory: $(docker stats --no-stream --format '{{.MemUsage}}' mednik)" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Image size: $(docker image inspect mednik:ci --format '{{.Size}}' | awk '{printf "%.0f MB", $1/1048576}')" | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: Six-asset depression sync inside the 512 MB container (manual runs)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Six-asset depression sync inside the 512 MB container
         timeout-minutes: 25
         run: |
           jar=$(mktemp)
