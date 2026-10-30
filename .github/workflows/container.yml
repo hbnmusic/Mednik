@@ -74,11 +74,23 @@ jobs:
             echo "$(date +%T) $status — $(docker stats --no-stream --format '{{.MemUsage}}' mednik)"
             sleep 10
           done
-          curl -fs -b "$jar" localhost:10000/api/v1/jobs/$job | python3 -c 'import json,sys; j=json.load(sys.stdin); print("\n".join(str(l) for l in j["log"][-40:])); print("error:", j["error"])' || true
+          curl -fs -b "$jar" localhost:10000/api/v1/jobs/$job > job.json || true
+          python3 - <<'PY'
+          import json
+          j = json.load(open("job.json"))
+          logs = [str(l.get("msg", l)) if isinstance(l, dict) else str(l) for l in j["log"]]
+          print("\n".join(logs[-60:]))
+          print("error:", j["error"])
+          trials = sum((a.get("trials") or {}).get("trials", 0) for a in (j.get("summary") or {}).get("assets", {}).values())
+          print("::notice title=sync log tail::" + "%0A".join(logs[-25:]).replace("\r", ""))
+          print(f"::notice title=sync result::status={j['status']} trials={trials} error={j['error']}")
+          open("trials.txt", "w").write(str(trials))
+          PY
           oom=$(docker inspect mednik --format '{{.State.OOMKilled}} restarts={{.RestartCount}}')
           echo "OOMKilled: $oom" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Sync status: $status" | tee -a "$GITHUB_STEP_SUMMARY"
           test "$status" = done
+          test "$(cat trials.txt)" -ge 20
           case "$oom" in false*) ;; *) exit 1;; esac
 
       - name: Container log
