@@ -1,0 +1,1094 @@
+{
+  "indication": "Schizophrenia",
+  "assets": [
+    {
+      "generic": "lumateperone",
+      "brand": "Caplyta"
+    },
+    {
+      "generic": "cariprazine",
+      "brand": "Vraylar"
+    },
+    {
+      "generic": "xanomeline and trospium",
+      "brand": "Cobenfy"
+    }
+  ],
+  "ingest_summary": {
+    "assets": {
+      "lumateperone": {
+        "label": {
+          "source": "dailymed",
+          "set_id": "db730b06-6351-47fd-8183-e61e61bbead5",
+          "effective_date": "2025-06-20",
+          "sections": [
+            "34066-1",
+            "34067-9",
+            "34068-7",
+            "34070-3",
+            "34073-7",
+            "34084-4",
+            "34092-7",
+            "43679-0",
+            "43684-0",
+            "43685-7"
+          ],
+          "cyp_key_classes": {
+            "strong_cyp3a4_inhibitor": "DOSE_ADJUSTMENT",
+            "moderate_cyp3a4_inhibitor": "DOSE_ADJUSTMENT",
+            "cyp3a4_inducer": "AVOID",
+            "strong_cyp2d6_inhibitor": "NOT_MENTIONED"
+          },
+          "boxed_warning": true,
+          "approved_indications": [
+            "schizophrenia",
+            "bipolar_depression",
+            "bipolar_depression",
+            "mdd"
+          ],
+          "label_efficacy_endpoints": 6,
+          "label_ae_endpoints": 22
+        },
+        "trials": {
+          "trials": 38,
+          "endpoints": 107,
+          "split": {
+            "industry_phase3plus": 19,
+            "industry_other": 7,
+            "academic_iis": 12
+          },
+          "label_linked_results": 5,
+          "replicated_primary_endpoints": 4
+        },
+        "literature": {
+          "documents": 154,
+          "extracted_docs": 25,
+          "endpoints": 5
+        }
+      },
+      "cariprazine": {
+        "label": {
+          "source": "dailymed",
+          "set_id": "4b5f7c65-aa2d-452a-b3db-bc85c06ff12f",
+          "effective_date": "2025-12-18",
+          "sections": [
+            "34066-1",
+            "34067-9",
+            "34068-7",
+            "34070-3",
+            "34073-7",
+            "34084-4",
+            "34092-7",
+            "43679-0",
+            "43684-0",
+            "43685-7"
+          ],
+          "cyp_key_classes": {
+            "strong_cyp3a4_inhibitor": "DOSE_ADJUSTMENT",
+            "moderate_cyp3a4_inhibitor": "DOSE_ADJUSTMENT",
+            "cyp3a4_inducer": "AVOID",
+            "strong_cyp2d6_inhibitor": "NOT_MENTIONED"
+          },
+          "boxed_warning": true,
+          "approved_indications": [
+            "schizophrenia",
+            "bipolar_mania",
+            "bipolar_depression",
+            "mdd"
+          ],
+          "label_efficacy_endpoints": 21,
+          "label_ae_endpoints": 83
+        },
+        "trials": {
+          "trials": 53,
+          "endpoints": 340,
+          "split": {
+            "industry_phase3plus": 22,
+            "industry_other": 16,
+            "academic_iis": 15
+          },
+          "label_linked_results": 7,
+          "replicated_primary_endpoints": 7
+        },
+        "literature": {
+          "documents": 220,
+          "extracted_docs": 25,
+          "endpoints": 2
+        }
+      },
+      "xanomeline and trospium": {
+        "label": {
+          "source": "dailymed",
+          "set_id": "8f0e73bf-6025-44f6-ab64-0983322de0df",
+          "effective_date": "2026-01-16",
+          "sections": [
+            "34067-9",
+            "34068-7",
+            "34070-3",
+            "34073-7",
+            "34084-4",
+            "34092-7",
+            "43679-0",
+            "43684-0",
+            "43685-7"
+          ],
+          "cyp_key_classes": {
+            "strong_cyp3a4_inhibitor": "NOT_MENTIONED",
+            "moderate_cyp3a4_inhibitor": "NOT_MENTIONED",
+            "cyp3a4_inducer": "NOT_MENTIONED",
+            "strong_cyp2d6_inhibitor": "MONITOR"
+          },
+          "boxed_warning": false,
+          "approved_indications": [
+            "schizophrenia"
+          ],
+          "label_efficacy_endpoints": 2,
+          "label_ae_endpoints": 13
+        },
+        "trials": {
+          "trials": 52,
+          "endpoints": 67,
+          "split": {
+            "industry_phase3plus": 32,
+            "industry_other": 13,
+            "academic_iis": 7
+          },
+          "label_linked_results": 0,
+          "replicated_primary_endpoints": 2
+        },
+        "literature": {
+          "documents": 162,
+          "extracted_docs": 25,
+          "endpoints": 22
+        }
+      }
+    },
+    "llm_provider": "gemini",
+    "mvd": {
+      "positive_symptoms": 0.9944,
+      "negative_symptoms": 0.8587,
+      "rapid_onset": 0.1908,
+      "relapse_prevention": 0.7318,
+      "psychosocial_functioning": 0.7573,
+      "cognition": 0.7318,
+      "akathisia_eps": 0.2618,
+      "weight_metabolic": 1.0,
+      "sedation": 0.6347,
+      "prolactin": 0.2906,
+      "anticholinergic_gi": 0.1037,
+      "label_safety": 0.4558,
+      "no_titration": 0.1,
+      "ddi_flexibility": 0.7208,
+      "dosing_convenience": 0.7171
+    },
+    "guidelines": {
+      "documents": 8,
+      "documents_mentioning_assets": 0,
+      "recommendations": 0
+    },
+    "llm_usage": {
+      "calls": 0,
+      "cache_hits": 29,
+      "rate_limited": 0,
+      "failed": 0,
+      "daily_quota_exhausted": false,
+      "input_chars": 0,
+      "prompt_tokens": 0,
+      "output_tokens": 0,
+      "approx_input_tokens": 0
+    }
+  },
+  "cyp": {
+    "lumateperone": {
+      "key_classes": {
+        "strong_cyp3a4_inhibitor": "DOSE_ADJUSTMENT",
+        "moderate_cyp3a4_inhibitor": "DOSE_ADJUSTMENT",
+        "cyp3a4_inducer": "AVOID",
+        "strong_cyp2d6_inhibitor": "NOT_MENTIONED"
+      },
+      "rules": [
+        {
+          "label": "CYP3A4 inducers",
+          "action": "AVOID",
+          "dose": null,
+          "verbatim": "Prevention or Management | Avoid concomitant use of CAPLYTA with CYP3A4 inducers.",
+          "population_rules": []
+        },
+        {
+          "label": "Moderate CYP3A4 inhibitors",
+          "action": "DOSE_ADJUSTMENT",
+          "dose": "21 mg once daily",
+          "verbatim": "Moderate CYP3A4 inhibitors is 21 mg once daily.",
+          "population_rules": []
+        },
+        {
+          "label": "Strong CYP3A4 inhibitors",
+          "action": "DOSE_ADJUSTMENT",
+          "dose": "10.5 mg once daily",
+          "verbatim": "Strong CYP3A4 inhibitors is 10.5 mg once daily.",
+          "population_rules": []
+        }
+      ]
+    },
+    "cariprazine": {
+      "key_classes": {
+        "strong_cyp3a4_inhibitor": "DOSE_ADJUSTMENT",
+        "moderate_cyp3a4_inhibitor": "DOSE_ADJUSTMENT",
+        "cyp3a4_inducer": "AVOID",
+        "strong_cyp2d6_inhibitor": "NOT_MENTIONED"
+      },
+      "rules": [
+        {
+          "label": "CYP3A4 inducers",
+          "action": "AVOID",
+          "dose": null,
+          "verbatim": "Intervention: | Concomitant use of VRAYLAR with a CYP3A4 inducer is not recommended [see Dosage and Administration ( 2.1 , 2.6 ) ].",
+          "population_rules": []
+        },
+        {
+          "label": "Moderate CYP3A4 inhibitors",
+          "action": "DOSE_ADJUSTMENT",
+          "dose": null,
+          "verbatim": "Intervention: | If VRAYLAR is used with a strong or moderate CYP3A4 inhibitor, reduce VRAYLAR dosage [see D osage and A dministration ( 2.6 ) ].",
+          "population_rules": [
+            {
+              "population": "pediatric",
+              "action": "AVOID",
+              "dose_instruction": null,
+              "verbatim": "Initiating VRAYLAR is not recommended in pediatric patients while taking a strong or moderate CYP3A4 Inhibitor."
+            }
+          ]
+        },
+        {
+          "label": "Strong CYP3A4 inhibitors",
+          "action": "DOSE_ADJUSTMENT",
+          "dose": null,
+          "verbatim": "Intervention: | If VRAYLAR is used with a strong or moderate CYP3A4 inhibitor, reduce VRAYLAR dosage [see D osage and A dministration ( 2.6 ) ].",
+          "population_rules": [
+            {
+              "population": "pediatric",
+              "action": "AVOID",
+              "dose_instruction": null,
+              "verbatim": "Initiating VRAYLAR is not recommended in pediatric patients while taking a strong or moderate CYP3A4 Inhibitor."
+            }
+          ]
+        },
+        {
+          "label": "CYP3A4 inhibitors",
+          "action": "MENTION_ONLY",
+          "dose": null,
+          "verbatim": "6 Dosage Modifications for CYP3A4 Inhibitors and Inducers",
+          "population_rules": []
+        }
+      ]
+    },
+    "xanomeline and trospium": {
+      "key_classes": {
+        "strong_cyp3a4_inhibitor": "NOT_MENTIONED",
+        "moderate_cyp3a4_inhibitor": "NOT_MENTIONED",
+        "cyp3a4_inducer": "NOT_MENTIONED",
+        "strong_cyp2d6_inhibitor": "MONITOR"
+      },
+      "rules": [
+        {
+          "label": "CYP3A4 substrates",
+          "action": "MONITOR",
+          "dose": null,
+          "verbatim": "| Monitor patients for increased frequency and/or severity of adverse reactions related to oral drugs that are sensitive substrates of CYP3A4 in patients taking COBENFY with such substrates.",
+          "population_rules": []
+        }
+      ]
+    }
+  },
+  "trials": {
+    "lumateperone": {
+      "n": 38,
+      "split": {
+        "ACADEMIC_IIS|PHASE4": 7,
+        "ACADEMIC_IIS|PHASE3": 2,
+        "INDUSTRY|PHASE3": 19,
+        "ACADEMIC_IIS|PHASE2": 3,
+        "INDUSTRY|PHASE1/PHASE2": 1,
+        "INDUSTRY|PHASE2": 2,
+        "INDUSTRY|PHASE1": 4
+      },
+      "industry_phase3": [
+        "NCT06229210",
+        "NCT04959032",
+        "NCT02469155",
+        "NCT02282761"
+      ],
+      "academic_iis": [
+        [
+          "NCT07369115",
+          "University of Texas at Austin",
+          "OTHER"
+        ],
+        [
+          "NCT07676669",
+          "Watim Medical & Dental College",
+          "OTHER"
+        ],
+        [
+          "NCT07699445",
+          "Massachusetts General Hospital",
+          "OTHER"
+        ],
+        [
+          "NCT07799493",
+          "Jason Careri",
+          "NETWORK"
+        ],
+        [
+          "NCT07824206",
+          "Future Options Research, LLC",
+          "OTHER"
+        ],
+        [
+          "NCT06174116",
+          "University of Massachusetts, Worcester",
+          "OTHER"
+        ],
+        [
+          "NCT05890768",
+          "University of New Mexico",
+          "OTHER"
+        ],
+        [
+          "NCT07623135",
+          "Eric Lenze",
+          "OTHER"
+        ],
+        [
+          "NCT06482554",
+          "Louisiana State University Health Sciences Center Shreveport",
+          "OTHER"
+        ],
+        [
+          "NCT07734103",
+          "CSTrials Inc.",
+          "NETWORK"
+        ],
+        [
+          "NCT05356013",
+          "University of Chicago",
+          "OTHER"
+        ],
+        [
+          "NCT03817528",
+          "New York State Psychiatric Institute",
+          "OTHER"
+        ]
+      ]
+    },
+    "cariprazine": {
+      "n": 53,
+      "split": {
+        "ACADEMIC_IIS|PHASE4": 10,
+        "INDUSTRY|PHASE2/PHASE3": 1,
+        "INDUSTRY|PHASE3": 21,
+        "ACADEMIC_IIS|PHASE3": 1,
+        "INDUSTRY|PHASE1/PHASE2": 1,
+        "ACADEMIC_IIS|PHASE2": 2,
+        "INDUSTRY|PHASE2": 10,
+        "INDUSTRY|PHASE1": 4,
+        "ACADEMIC_IIS|PHASE1": 2,
+        "INDUSTRY|NA": 1
+      },
+      "industry_phase3": [
+        "NCT07722728",
+        "NCT05368558",
+        "NCT04578756",
+        "NCT05168007",
+        "NCT03817502",
+        "NCT03593213",
+        "NCT01412060",
+        "NCT01104766",
+        "NCT01104779",
+        "NCT01104792"
+      ],
+      "academic_iis": [
+        [
+          "NCT07665073",
+          "Pakistan Institute of Medical Sciences",
+          "OTHER_GOV"
+        ],
+        [
+          "NCT05060549",
+          "New York State Psychiatric Institute",
+          "OTHER"
+        ],
+        [
+          "NCT07266545",
+          "Mayo Clinic",
+          "OTHER"
+        ],
+        [
+          "NCT07676669",
+          "Watim Medical & Dental College",
+          "OTHER"
+        ],
+        [
+          "NCT05933538",
+          "Sultan Qaboos University",
+          "OTHER"
+        ],
+        [
+          "NCT06433635",
+          "Massachusetts General Hospital",
+          "OTHER"
+        ],
+        [
+          "NCT05741502",
+          "Ohio State University",
+          "OTHER"
+        ],
+        [
+          "NCT05384483",
+          "The Medical Research Network",
+          "OTHER"
+        ],
+        [
+          "NCT05913947",
+          "Aalborg University Hospital",
+          "OTHER"
+        ],
+        [
+          "NCT04843423",
+          "Dr. Martin A. Katzman",
+          "OTHER"
+        ],
+        [
+          "NCT04771299",
+          "Lakshmi N Yatham",
+          "OTHER"
+        ],
+        [
+          "NCT05063201",
+          "Kyle Kampman",
+          "OTHER"
+        ],
+        [
+          "NCT03430544",
+          "Anna Rose Childress, Ph.D.",
+          "OTHER"
+        ],
+        [
+          "NCT07715253",
+          "New York State Psychiatric Institute",
+          "OTHER"
+        ],
+        [
+          "NCT07121868",
+          "Aya Mohammed Abdel Magid Abdel Hamid",
+          "OTHER"
+        ]
+      ]
+    },
+    "xanomeline and trospium": {
+      "n": 52,
+      "split": {
+        "INDUSTRY|PHASE4": 3,
+        "ACADEMIC_IIS|PHASE4": 2,
+        "ACADEMIC_IIS|PHASE3": 1,
+        "INDUSTRY|PHASE3": 29,
+        "ACADEMIC_IIS|PHASE1/PHASE2": 2,
+        "INDUSTRY|PHASE2": 1,
+        "ACADEMIC_IIS|EARLY_PHASE1": 2,
+        "INDUSTRY|PHASE1": 7,
+        "INDUSTRY|NA": 5
+      },
+      "industry_phase3": [
+        "NCT07288567",
+        "NCT07424404",
+        "NCT07686263",
+        "NCT06882785",
+        "NCT06572449",
+        "NCT05919823",
+        "NCT05304767",
+        "NCT05643170",
+        "NCT04659174",
+        "NCT04738123",
+        "NCT04820309",
+        "NCT05145413",
+        "NCT04659161"
+      ],
+      "academic_iis": [
+        [
+          "NCT06923891",
+          "Vanguard Research Group",
+          "OTHER"
+        ],
+        [
+          "NCT06924255",
+          "Collaborative Neuroscience Research, LLC",
+          "NETWORK"
+        ],
+        [
+          "NCT07084831",
+          "European Group for Research In Schizophrenia",
+          "OTHER"
+        ],
+        [
+          "NCT07423546",
+          "New York State Psychiatric Institute",
+          "OTHER"
+        ],
+        [
+          "NCT07624227",
+          "Joshua A. Lile, Ph.D.",
+          "OTHER"
+        ],
+        [
+          "NCT07228338",
+          "University of Texas Southwestern Medical Center",
+          "OTHER"
+        ],
+        [
+          "NCT07721272",
+          "University of Texas Southwestern Medical Center",
+          "OTHER"
+        ]
+      ]
+    }
+  },
+  "confounder_example": {
+    "node": "positive_symptoms::cariprazine",
+    "alert": true,
+    "items": [
+      [
+        "Baseline severity",
+        "89.0 (PANSS Total)",
+        "96.6 (PANSS Total)",
+        false
+      ],
+      [
+        "Trial architecture",
+        "acute parallel, placebo-controlled",
+        "acute parallel, placebo-controlled",
+        false
+      ],
+      [
+        "Primary endpoint timing",
+        "4.0 wk",
+        "6.0 wk",
+        false
+      ],
+      [
+        "Placebo response",
+        "-10.3 (PANSS Total change)",
+        "-14.3 (PANSS Total change)",
+        true
+      ]
+    ],
+    "caveat": "No head-to-head trial compares Caplyta (lumateperone) with Vraylar (cariprazine); the comparison is indirect across separate placebo-controlled programmes (Caplyta (lumateperone): NCT02282761, USPI \u00a714 Study 1; Vraylar (cariprazine): USPI \u00a714 Study 1, USPI \u00a714 Study 2, USPI \u00a714 Study 3). Placebo-arm change differed (-10.3 vs -14.3); drug\u2013placebo differences are not directly transferable across programmes. Differences should be presented as descriptive and not as evidence of comparative efficacy or safety.",
+    "refs": [
+      "NCT02282761"
+    ]
+  },
+  "matrix": [
+    {
+      "mvd_key": "positive_symptoms",
+      "comparator": "cariprazine",
+      "x": -49.36,
+      "y": 99.4,
+      "tier": "1A",
+      "quadrant": "TL",
+      "explanation": "d +0.30 vs +0.44 \u2192 \u0394d -0.14 (indirect 95% CI -0.36 to +0.09)"
+    },
+    {
+      "mvd_key": "negative_symptoms",
+      "comparator": "cariprazine",
+      "x": null,
+      "y": 85.9,
+      "tier": null,
+      "quadrant": "TL",
+      "explanation": "Insufficient evidence on Product A"
+    },
+    {
+      "mvd_key": "rapid_onset",
+      "comparator": "cariprazine",
+      "x": null,
+      "y": 19.1,
+      "tier": null,
+      "quadrant": "BL",
+      "explanation": "Insufficient evidence on both sides"
+    },
+    {
+      "mvd_key": "relapse_prevention",
+      "comparator": "cariprazine",
+      "x": 44.0,
+      "y": 73.2,
+      "tier": "1B",
+      "quadrant": "TR",
+      "explanation": "d +0.55 vs +0.40 \u2192 \u0394d +0.14 (indirect 95% CI -0.23 to +0.52)"
+    },
+    {
+      "mvd_key": "psychosocial_functioning",
+      "comparator": "cariprazine",
+      "x": null,
+      "y": 75.7,
+      "tier": null,
+      "quadrant": "TL",
+      "explanation": "Insufficient evidence on both sides"
+    },
+    {
+      "mvd_key": "cognition",
+      "comparator": "cariprazine",
+      "x": null,
+      "y": 73.2,
+      "tier": null,
+      "quadrant": "TL",
+      "explanation": "Insufficient evidence on both sides"
+    },
+    {
+      "mvd_key": "akathisia_eps",
+      "comparator": "cariprazine",
+      "x": 56.2,
+      "y": 26.2,
+      "tier": "2",
+      "quadrant": "BR",
+      "explanation": "Excess incidence vs placebo -0.6 pp (A) vs +8.0 pp (B) \u2192 \u0394 +8.6 pp"
+    },
+    {
+      "mvd_key": "weight_metabolic",
+      "comparator": "cariprazine",
+      "x": 20.61,
+      "y": 100.0,
+      "tier": "2",
+      "quadrant": "TR",
+      "explanation": "Excess incidence vs placebo -0.3 pp (A) vs +1.5 pp (B) \u2192 \u0394 +1.8 pp"
+    },
+    {
+      "mvd_key": "sedation",
+      "comparator": "cariprazine",
+      "x": -98.66,
+      "y": 63.5,
+      "tier": "1A",
+      "quadrant": "TL",
+      "explanation": "Excess incidence vs placebo +14.0 pp (A) vs +1.5 pp (B) \u2192 \u0394 -12.5 pp"
+    },
+    {
+      "mvd_key": "prolactin",
+      "comparator": "cariprazine",
+      "x": null,
+      "y": 29.1,
+      "tier": null,
+      "quadrant": "BL",
+      "explanation": "Insufficient evidence on both sides"
+    },
+    {
+      "mvd_key": "anticholinergic_gi",
+      "comparator": "cariprazine",
+      "x": -51.09,
+      "y": 10.4,
+      "tier": "1A",
+      "quadrant": "BL",
+      "explanation": "Excess incidence vs placebo +3.2 pp (A) vs +0.4 pp (B) \u2192 \u0394 -2.8 pp"
+    },
+    {
+      "mvd_key": "label_safety",
+      "comparator": "cariprazine",
+      "x": 13.33,
+      "y": 45.6,
+      "tier": "1A",
+      "quadrant": "BL",
+      "explanation": "Label score 1.50 vs 1.10 (\u0394 +0.40 on 0\u20133 scale)"
+    },
+    {
+      "mvd_key": "no_titration",
+      "comparator": "cariprazine",
+      "x": 66.67,
+      "y": 10.0,
+      "tier": "1A",
+      "quadrant": "BR",
+      "explanation": "Label score 3.00 vs 1.00 (\u0394 +2.00 on 0\u20133 scale)"
+    },
+    {
+      "mvd_key": "ddi_flexibility",
+      "comparator": "cariprazine",
+      "x": 0.0,
+      "y": 72.1,
+      "tier": "1A",
+      "quadrant": "TL",
+      "explanation": "Label score 2.00 vs 2.00 (\u0394 +0.00 on 0\u20133 scale)"
+    },
+    {
+      "mvd_key": "dosing_convenience",
+      "comparator": "cariprazine",
+      "x": 0.0,
+      "y": 71.7,
+      "tier": "1A",
+      "quadrant": "TL",
+      "explanation": "Label score 3.00 vs 3.00 (\u0394 +0.00 on 0\u20133 scale)"
+    },
+    {
+      "mvd_key": "positive_symptoms",
+      "comparator": "xanomeline and trospium",
+      "x": -75.24,
+      "y": 99.4,
+      "tier": "1A",
+      "quadrant": "TL",
+      "explanation": "d +0.30 vs +0.55 \u2192 \u0394d -0.24 (indirect 95% CI -0.50 to +0.01)"
+    },
+    {
+      "mvd_key": "negative_symptoms",
+      "comparator": "xanomeline and trospium",
+      "x": null,
+      "y": 85.9,
+      "tier": null,
+      "quadrant": "TL",
+      "explanation": "Insufficient evidence on Product A"
+    },
+    {
+      "mvd_key": "rapid_onset",
+      "comparator": "xanomeline and trospium",
+      "x": null,
+      "y": 19.1,
+      "tier": null,
+      "quadrant": "BL",
+      "explanation": "Insufficient evidence on both sides"
+    },
+    {
+      "mvd_key": "relapse_prevention",
+      "comparator": "xanomeline and trospium",
+      "x": null,
+      "y": 73.2,
+      "tier": null,
+      "quadrant": "TL",
+      "explanation": "Insufficient evidence on comparator"
+    },
+    {
+      "mvd_key": "psychosocial_functioning",
+      "comparator": "xanomeline and trospium",
+      "x": null,
+      "y": 75.7,
+      "tier": null,
+      "quadrant": "TL",
+      "explanation": "Insufficient evidence on Product A"
+    },
+    {
+      "mvd_key": "cognition",
+      "comparator": "xanomeline and trospium",
+      "x": null,
+      "y": 73.2,
+      "tier": null,
+      "quadrant": "TL",
+      "explanation": "Insufficient evidence on Product A"
+    },
+    {
+      "mvd_key": "akathisia_eps",
+      "comparator": "xanomeline and trospium",
+      "x": 25.81,
+      "y": 26.2,
+      "tier": "2",
+      "quadrant": "BR",
+      "explanation": "Excess incidence vs placebo -0.6 pp (A) vs +1.8 pp (B) \u2192 \u0394 +2.3 pp"
+    },
+    {
+      "mvd_key": "weight_metabolic",
+      "comparator": "xanomeline and trospium",
+      "x": -36.11,
+      "y": 100.0,
+      "tier": "2",
+      "quadrant": "TL",
+      "explanation": "Excess incidence vs placebo -0.3 pp (A) vs -3.8 pp (B) \u2192 \u0394 -3.5 pp"
+    },
+    {
+      "mvd_key": "sedation",
+      "comparator": "xanomeline and trospium",
+      "x": -98.9,
+      "y": 63.5,
+      "tier": "1A",
+      "quadrant": "TL",
+      "explanation": "Excess incidence vs placebo +14.0 pp (A) vs +1.0 pp (B) \u2192 \u0394 -13.0 pp"
+    },
+    {
+      "mvd_key": "prolactin",
+      "comparator": "xanomeline and trospium",
+      "x": null,
+      "y": 29.1,
+      "tier": null,
+      "quadrant": "BL",
+      "explanation": "Insufficient evidence on Product A"
+    },
+    {
+      "mvd_key": "anticholinergic_gi",
+      "comparator": "xanomeline and trospium",
+      "x": 60.94,
+      "y": 10.4,
+      "tier": "1A",
+      "quadrant": "BR",
+      "explanation": "Excess incidence vs placebo +3.2 pp (A) vs +6.8 pp (B) \u2192 \u0394 +3.5 pp"
+    },
+    {
+      "mvd_key": "label_safety",
+      "comparator": "xanomeline and trospium",
+      "x": -10.0,
+      "y": 45.6,
+      "tier": "1A",
+      "quadrant": "BL",
+      "explanation": "Label score 1.50 vs 1.80 (\u0394 -0.30 on 0\u20133 scale)"
+    },
+    {
+      "mvd_key": "no_titration",
+      "comparator": "xanomeline and trospium",
+      "x": 66.67,
+      "y": 10.0,
+      "tier": "1A",
+      "quadrant": "BR",
+      "explanation": "Label score 3.00 vs 1.00 (\u0394 +2.00 on 0\u20133 scale)"
+    },
+    {
+      "mvd_key": "ddi_flexibility",
+      "comparator": "xanomeline and trospium",
+      "x": -29.17,
+      "y": 72.1,
+      "tier": "1A",
+      "quadrant": "TL",
+      "explanation": "Label score 2.00 vs 2.88 (\u0394 -0.88 on 0\u20133 scale)"
+    },
+    {
+      "mvd_key": "dosing_convenience",
+      "comparator": "xanomeline and trospium",
+      "x": 58.33,
+      "y": 71.7,
+      "tier": "1A",
+      "quadrant": "TR",
+      "explanation": "Label score 3.00 vs 1.25 (\u0394 +1.75 on 0\u20133 scale)"
+    }
+  ],
+  "heatmap_columns": [
+    "Bipolar I Depression, Acute (\u22648 wk)",
+    "Bipolar I Depression, Adjunctive, Acute (\u22648 wk)",
+    "Bipolar I Depression, Pediatric/Adolescent, Acute (\u22648 wk)",
+    "Major Depressive Disorder, Acute (\u22648 wk)",
+    "Major Depressive Disorder, Adjunctive, Acute (\u22648 wk)",
+    "Major Depressive Disorder, Adjunctive, 9\u201326 wk",
+    "Major Depressive Disorder, Older adult, Adjunctive, 9\u201326 wk",
+    "Schizophrenia, Acute (\u22648 wk)",
+    "Schizophrenia, 9\u201326 wk",
+    "Schizophrenia, Maintenance (>26 wk)",
+    "Schizophrenia, Adjunctive, 9\u201326 wk",
+    "Schizophrenia, Pediatric/Adolescent, Maintenance (>26 wk)",
+    "Irritability Associated with Autism, Pediatric/Adolescent, Acute (\u22648 wk)",
+    "Bipolar I Mania / Mixed, Acute (\u22648 wk)",
+    "Dementia-related Psychosis / Agitation, Acute (\u22648 wk)",
+    "Schizoaffective Disorder, Acute (\u22648 wk)"
+  ],
+  "study_concept": {
+    "gap": {
+      "row": "WEIGHT",
+      "row_label": "Weight gain (\u22657% / kg change)",
+      "column": "schizophrenia|adult|intermediate",
+      "column_label": "Schizophrenia, 9\u201326 wk",
+      "cell_state": "white_space"
+    },
+    "design": {
+      "type": "Phase 4 randomized active-controlled",
+      "title": "Randomized, rater-blinded, active-controlled 16-week tolerability study",
+      "rationale": "44 precedent trial(s) used an active comparator for this endpoint; a comparative design gives Tier 1A potential.",
+      "arms": [
+        "Study drug (label dose)",
+        "Active comparator (label dose)"
+      ],
+      "blinding": "Rater-blinded",
+      "primary_analysis": "Between-group difference (ANCOVA / logistic regression)"
+    },
+    "duration_weeks": 16.0,
+    "sample_size": {
+      "basis": "two-sample comparison of means (MMRM-equivalent)",
+      "assumption": "d = 0.19 (80% of historical median |d| 0.24, k=1 endpoints in Schizophrenia)",
+      "n_per_arm": 431,
+      "n_per_arm_with_dropout": 603,
+      "alpha": 0.05,
+      "power": 0.8,
+      "dropout_assumed": 0.285,
+      "total_n": 1206
+    },
+    "n_precedents": 119,
+    "precedents": [
+      "NCT04820309",
+      "NCT06585787",
+      "NCT06947941",
+      "NCT04578756",
+      "NCT04738123",
+      "NCT06882785",
+      "NCT05919823",
+      "NCT07379827",
+      "NCT06590298",
+      "NCT00982020",
+      "NCT06969755",
+      "NCT00159757",
+      "NCT00303602",
+      "NCT00816907",
+      "NCT00806234"
+    ]
+  },
+  "guideline_status": {
+    "Caplyta (lumateperone)": "Not positioned in ingested guidelines",
+    "Vraylar (cariprazine)": "Not positioned in ingested guidelines",
+    "Cobenfy (xanomeline and trospium)": "Not positioned in ingested guidelines"
+  },
+  "citation_audit": {
+    "accepted": 65,
+    "rejected": 10
+  },
+  "checks": [
+    {
+      "check": "Ingest job completed",
+      "status": "PASS",
+      "detail": "5s"
+    },
+    {
+      "check": "Gemini usage for the sync",
+      "status": "PASS",
+      "detail": "0 requests sent, 29 from cache, ~0 input tokens, 0 output tokens, 0 rate-limit waits, 0 extractions given up"
+    },
+    {
+      "check": "Caplyta: USPI sections parsed by LOINC",
+      "status": "PASS",
+      "detail": "set_id db730b06-6351-47fd-8183-e61e61bbead5 eff 2025-06-20; LOINC ['34066-1', '34067-9', '34068-7', '34070-3', '34073-7', '34084-4', '34092-7', '43679-0', '43684-0', '43685-7']"
+    },
+    {
+      "check": "Caplyta: \u00a77 CYP3A4 rules extracted with verbatim text",
+      "status": "PASS",
+      "detail": "CYP3A4 inducers \u2192 AVOID; Moderate CYP3A4 inhibitors \u2192 DOSE_ADJUSTMENT [21 mg once daily]; Strong CYP3A4 inhibitors \u2192 DOSE_ADJUSTMENT [10.5 mg once daily]"
+    },
+    {
+      "check": "Caplyta: strong_cyp3a4_inhibitor = DOSE_ADJUSTMENT",
+      "status": "PASS",
+      "detail": "parsed DOSE_ADJUSTMENT"
+    },
+    {
+      "check": "Caplyta: moderate_cyp3a4_inhibitor = DOSE_ADJUSTMENT",
+      "status": "PASS",
+      "detail": "parsed DOSE_ADJUSTMENT"
+    },
+    {
+      "check": "Caplyta: cyp3a4_inducer = AVOID",
+      "status": "PASS",
+      "detail": "parsed AVOID"
+    },
+    {
+      "check": "Vraylar: USPI sections parsed by LOINC",
+      "status": "PASS",
+      "detail": "set_id 4b5f7c65-aa2d-452a-b3db-bc85c06ff12f eff 2025-12-18; LOINC ['34066-1', '34067-9', '34068-7', '34070-3', '34073-7', '34084-4', '34092-7', '43679-0', '43684-0', '43685-7']"
+    },
+    {
+      "check": "Vraylar: \u00a77 CYP3A4 rules extracted with verbatim text",
+      "status": "PASS",
+      "detail": "CYP3A4 inducers \u2192 AVOID; Moderate CYP3A4 inhibitors \u2192 DOSE_ADJUSTMENT (pediatric: AVOID); Strong CYP3A4 inhibitors \u2192 DOSE_ADJUSTMENT (pediatric: AVOID); CYP3A4 inhibitors \u2192 MENTION_ONLY"
+    },
+    {
+      "check": "Vraylar: strong_cyp3a4_inhibitor = DOSE_ADJUSTMENT",
+      "status": "PASS",
+      "detail": "parsed DOSE_ADJUSTMENT"
+    },
+    {
+      "check": "Vraylar: cyp3a4_inducer = AVOID",
+      "status": "PASS",
+      "detail": "parsed AVOID"
+    },
+    {
+      "check": "Cobenfy: USPI sections parsed by LOINC",
+      "status": "PASS",
+      "detail": "set_id 8f0e73bf-6025-44f6-ab64-0983322de0df eff 2026-01-16; LOINC ['34067-9', '34068-7', '34070-3', '34073-7', '34084-4', '34092-7', '43679-0', '43684-0', '43685-7']"
+    },
+    {
+      "check": "Cobenfy: \u00a77 CYP3A4 rules extracted with verbatim text",
+      "status": "PASS",
+      "detail": "CYP3A4 substrates \u2192 MONITOR"
+    },
+    {
+      "check": "Dose adjustment distinguished from avoid / contraindication",
+      "status": "PASS",
+      "detail": "actions seen: ['AVOID', 'DOSE_ADJUSTMENT', 'MENTION_ONLY', 'MONITOR']"
+    },
+    {
+      "check": "Caplyta: sponsor class matches raw leadSponsor.class for all 38 trials",
+      "status": "PASS",
+      "detail": "4 INDUSTRY Phase 3 in Schizophrenia; 12 academic/IIS overall"
+    },
+    {
+      "check": "Caplyta: \u22651 INDUSTRY Phase 3 trial in Schizophrenia",
+      "status": "PASS",
+      "detail": "NCT06229210, NCT04959032, NCT02469155, NCT02282761"
+    },
+    {
+      "check": "Vraylar: sponsor class matches raw leadSponsor.class for all 53 trials",
+      "status": "PASS",
+      "detail": "10 INDUSTRY Phase 3 in Schizophrenia; 15 academic/IIS overall"
+    },
+    {
+      "check": "Vraylar: \u22651 INDUSTRY Phase 3 trial in Schizophrenia",
+      "status": "PASS",
+      "detail": "NCT07722728, NCT05368558, NCT04578756, NCT05168007, NCT03817502, NCT03593213"
+    },
+    {
+      "check": "Cobenfy: sponsor class matches raw leadSponsor.class for all 52 trials",
+      "status": "PASS",
+      "detail": "13 INDUSTRY Phase 3 in Schizophrenia; 7 academic/IIS overall"
+    },
+    {
+      "check": "Cobenfy: \u22651 INDUSTRY Phase 3 trial in Schizophrenia",
+      "status": "PASS",
+      "detail": "NCT07288567, NCT07424404, NCT07686263, NCT06882785, NCT06572449, NCT05919823"
+    },
+    {
+      "check": "2\u00d72 matrix populated",
+      "status": "PASS",
+      "detail": "19/30 nodes with a differentiation score; positive_symptoms vs cariprazine: TL, relapse_prevention vs cariprazine: TR, akathisia_eps vs cariprazine: BR, weight_metabolic vs cariprazine: TR, sedation vs cariprazine: TL, anticholinergic_gi vs cariprazine: BL"
+    },
+    {
+      "check": "Cross-trial confounder alert computed",
+      "status": "PASS",
+      "detail": "positive_symptoms vs cariprazine: alert=True; Baseline severity 89.0 (PANSS Total) vs 96.6 (PANSS Total); Trial architecture acute parallel, placebo-controlled vs acute parallel, placebo-controlled; Primary endpoint timing 4.0 wk vs 6.0 wk; Placebo response -10.3 (PANSS Total change) vs -14.3 (PANSS Total change) \u26a0"
+    },
+    {
+      "check": "Matrix evidence cites real NCT IDs",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "Evidence heatmap populated",
+      "status": "PASS",
+      "detail": "29 rows \u00d7 16 columns; 35 evidence cells (badges L[2, 3, 4, 5]), 429 white-space/registered"
+    },
+    {
+      "check": "Heatmap cells cite real NCT IDs",
+      "status": "PASS",
+      "detail": "33 cells"
+    },
+    {
+      "check": "Study concept generator uses live precedent NCT IDs",
+      "status": "PASS",
+      "detail": "WEIGHT @ schizophrenia|adult|intermediate: Phase 4 randomized active-controlled; N/arm 603; precedents ['NCT04820309', 'NCT06585787', 'NCT06947941', 'NCT04578756', 'NCT04738123', 'NCT06882785']"
+    },
+    {
+      "check": "PubMed records ingested",
+      "status": "PASS",
+      "detail": "686 documents with PMIDs"
+    },
+    {
+      "check": "Evidence / drivers / guidelines cite real PMIDs",
+      "status": "PASS",
+      "detail": "endpoints 10, MVD 23, guideline 0; e.g. ['18642975', '24828964', '27106681', '27485931', '27514778', '28038919']"
+    },
+    {
+      "check": "Citation validator active",
+      "status": "PASS",
+      "detail": "65 accepted / 10 rejected extractions"
+    },
+    {
+      "check": "Dossier export",
+      "status": "PASS",
+      "detail": "backend/verification_dossier.md"
+    },
+    {
+      "check": "Dossier PDF export",
+      "status": "PASS",
+      "detail": "662 KB"
+    }
+  ]
+}
