@@ -105,7 +105,7 @@ export interface Driver {
   id: number;
   key: string;
   name: string;
-  category: "EFFICACY" | "FUNCTION_QOL" | "SAFETY_TOLERABILITY" | "EXECUTION_DOSING";
+  category: "EFFICACY" | "FUNCTION_QOL" | "SAFETY_TOLERABILITY" | "EXECUTION_DOSING" | "OTHER";
   evidence_score: number;
   override_score: number | null;
   effective_score: number;
@@ -116,6 +116,8 @@ export interface Driver {
   supporting_ids: string[];
   verbatim_evidence: Quote[];
   kind: string;
+  measure_key: string | null;
+  measure_name: string | null;
   rows: string[];
 }
 

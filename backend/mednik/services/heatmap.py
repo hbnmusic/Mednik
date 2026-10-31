@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from ..models import Asset, ClinicalStudy, Indication, MarketValueDriver
 from ..taxonomy import SCALES, SCALE_BY_KEY, ColumnKey, column_label, indication_label, mvd_profile, MVD_BY_KEY
 from .evidence import endpoint_pairs, serialize_endpoint, serialize_study_brief, summarize_effect, summarize_risk
-from .mvd import effective_scores
+from .mvd import measure_scores, effective_scores
 from .trials_ingest import column_for
 
 ACTIVE_STATUSES = {"RECRUITING", "NOT_YET_RECRUITING", "ACTIVE_NOT_RECRUITING", "ENROLLING_BY_INVITATION"}
@@ -95,7 +95,7 @@ def build_heatmap(session: Session, asset: Asset, *, indication_keys: list[str] 
     for ind in session.execute(select(Indication)).scalars().all():
         drivers = session.execute(select(MarketValueDriver).where(MarketValueDriver.indication_id == ind.id)).scalars().all()
         if drivers:
-            mvd_scores[ind.key] = {k: v["score"] for k, v in effective_scores(drivers, persona).items()}
+            mvd_scores[ind.key] = measure_scores(drivers, effective_scores(drivers, persona))
 
     # --- rows -----------------------------------------------------------------------
     used_rows = {e.endpoint_scale_name for e, _ in pairs if e.column_key in col_meta}

@@ -47,7 +47,7 @@ from ..services.pdf_ingest import extraction_text, store_pdf
 from ..services.regulatory_ingest import load_parsed_label
 from ..services.study_concepts import generate_study_concept
 from ..services.tiering import TIER_RULES, TIER_WEIGHTS, VALIDITY_RULES
-from ..taxonomy import INDICATIONS, PERSONAS, SCALE_BY_KEY, asset_terms, mvd_profile
+from ..taxonomy import INDICATIONS, PERSONAS, SCALE_BY_KEY, asset_terms
 from . import auth
 
 log = logging.getLogger("mednik.api")
@@ -271,8 +271,7 @@ def get_mvd(indication: str, persona: str = "evidence", overrides: str | None = 
     items = sorted((serialize_driver(d, eff[d.attribute_key]) for d in drivers), key=lambda x: -x["effective_score"])
     return {"indication": {"id": ind.id, "name": ind.name, "key": ind.key}, "persona": persona,
             "personas": {k: v["label"] for k, v in PERSONAS.items()}, "drivers": items,
-            "profile": list(mvd_profile(ind.key)),
-            "method": "Preference index from DCE/conjoint/survey extraction (75%) + guideline mention share (25%), rescaled to 0.10–1.00."}
+            "method": "Drivers are discovered from guidelines (65% of the weight) and preference studies (35%), grouped by an LLM, and rescaled to 0.10–1.00."}
 
 
 class OverrideIn(BaseModel):

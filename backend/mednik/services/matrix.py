@@ -20,10 +20,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Asset, ClinicalStudy, Indication, MarketValueDriver
-from ..taxonomy import MVD_BY_KEY, SCALE_BY_KEY, asset_terms, mvd_profile
+from ..taxonomy import MVD_BY_KEY, SCALE_BY_KEY, asset_terms
 from .confounders import compare_designs
 from .evidence import endpoint_pairs, serialize_endpoint, summarize_effect, summarize_risk
-from .mvd import effective_scores
+from .mvd import effective_scores, measure_key_of
 from .regulatory_ingest import load_parsed_label
 from .tiering import TIER_WEIGHTS, weaker_tier
 
@@ -169,23 +169,36 @@ def build_matrix(session: Session, indication: Indication, asset_a: Asset, compa
                  overrides: dict[str, float] | None = None, tier_filter: str = "all") -> dict[str, Any]:
     drivers = session.execute(select(MarketValueDriver).where(MarketValueDriver.indication_id == indication.id)).scalars().all()
     eff = effective_scores(drivers, persona, overrides)
-    profile = [k for k in mvd_profile(indication.key)]
+    drivers = sorted(drivers, key=lambda d: -eff[d.attribute_key]["score"])
     parsed_a = load_parsed_label(session, asset_a)
+    cache: dict[tuple[int, str], dict[str, Any] | None] = {}
+
+    def metric(asset: Asset, mk: str, parsed: dict[str, Any]) -> dict[str, Any] | None:
+        if (asset.id, mk) not in cache:
+            cache[(asset.id, mk)] = asset_metric(session, asset, mk, indication, parsed, tier_filter)
+        return cache[(asset.id, mk)]
+
     nodes = []
     for b in comparators:
         parsed_b = load_parsed_label(session, b)
-        for key in profile:
-            mdef = MVD_BY_KEY[key]
-            y = 100 * eff.get(key, {"score": 0.10})["score"]
-            ma = asset_metric(session, asset_a, key, indication, parsed_a, tier_filter)
-            mb = asset_metric(session, b, key, indication, parsed_b, tier_filter)
-            diff = differentiation(mdef.kind, ma, mb)
+        for d in drivers:
+            key, mk = d.attribute_key, measure_key_of(d)
+            mdef = MVD_BY_KEY.get(mk) if mk else None
+            y = 100 * eff[key]["score"]
+            if mdef:
+                ma, mb = metric(asset_a, mk, parsed_a), metric(b, mk, parsed_b)
+                diff = differentiation(mdef.kind, ma, mb)
+            else:
+                ma = mb = None
+                diff = {"x_raw": None, "insufficient": True, "uncertain": True, "unmeasured": True,
+                        "explanation": "Named by the guideline / preference sources, but no trial, label or safety measure in mednik corresponds to it, so it cannot be compared"}
             claim_tier = weaker_tier(ma["tier"] if ma else None, mb["tier"] if mb else None)
             w = TIER_WEIGHTS.get(claim_tier or "", 0.0)
             x = round(max(-100.0, min(100.0, diff["x_raw"] * w)), 2) if diff["x_raw"] is not None else None
             q = quadrant(x, y)
             nodes.append({
-                "id": f"{key}::{b.generic_name}", "mvd_key": key, "mvd_name": mdef.name, "category": mdef.category, "kind": mdef.kind,
+                "id": f"{key}::{b.generic_name}", "mvd_key": key, "mvd_name": d.attribute_name, "category": d.category,
+                "kind": mdef.kind if mdef else "unmeasured", "measure_key": mk,
                 "comparator": b.generic_name, "comparator_label": asset_label(b), "x": x,
                 "x_raw": round(diff["x_raw"], 2) if diff["x_raw"] is not None else None, "y": round(y, 1),
                 "tier": claim_tier, "tier_weight": w, "quadrant": q, "quadrant_label": QUADRANTS[q],
@@ -311,32 +324,41 @@ def node_detail(session: Session, indication: Indication, asset_a: Asset, asset_
                 overrides: dict[str, float] | None = None, tier_filter: str = "all") -> dict[str, Any]:
     from .objections import objection_card
 
-    mdef = MVD_BY_KEY[mvd_key]
-    pa, pb = load_parsed_label(session, asset_a), load_parsed_label(session, asset_b)
-    ma = asset_metric(session, asset_a, mvd_key, indication, pa, tier_filter)
-    mb = asset_metric(session, asset_b, mvd_key, indication, pb, tier_filter)
-    diff = differentiation(mdef.kind, ma, mb)
     drivers = session.execute(select(MarketValueDriver).where(MarketValueDriver.indication_id == indication.id)).scalars().all()
+    driver = next((d for d in drivers if d.attribute_key == mvd_key), None)
+    mk = measure_key_of(driver) if driver else (mvd_key if mvd_key in MVD_BY_KEY else None)
+    mdef = MVD_BY_KEY.get(mk) if mk else None
+    pa, pb = load_parsed_label(session, asset_a), load_parsed_label(session, asset_b)
+    if mdef:
+        ma = asset_metric(session, asset_a, mk, indication, pa, tier_filter)
+        mb = asset_metric(session, asset_b, mk, indication, pb, tier_filter)
+        diff = differentiation(mdef.kind, ma, mb)
+    else:
+        ma = mb = None
+        diff = {"x_raw": None, "insufficient": True, "uncertain": True, "unmeasured": True,
+                "explanation": "No trial, label or safety measure in mednik corresponds to this driver"}
     eff = effective_scores(drivers, persona, overrides)
     y = 100 * eff.get(mvd_key, {"score": 0.1})["score"]
     claim_tier = weaker_tier(ma["tier"] if ma else None, mb["tier"] if mb else None)
     x = round(diff["x_raw"] * TIER_WEIGHTS.get(claim_tier or "", 0), 2) if diff["x_raw"] is not None else None
     q = quadrant(x, y)
+    rows = mdef.rows if mdef else ()
 
     def evidence_list(asset: Asset, m: dict[str, Any] | None) -> list[dict[str, Any]]:
         if not m or "endpoint_ids" not in m:
             return []
         ids = set(m["endpoint_ids"])
-        return [serialize_endpoint(e, s) for e, s in endpoint_pairs(session, asset.id, indication_key=indication.key, rows=mdef.rows) if e.id in ids]
+        return [serialize_endpoint(e, s) for e, s in endpoint_pairs(session, asset.id, indication_key=indication.key, rows=rows) if e.id in ids]
 
     ev_a, ev_b = evidence_list(asset_a, ma), evidence_list(asset_b, mb)
     studies_a = with_linked_registry(session, asset_a, [session.get(ClinicalStudy, i) for i in (ma or {}).get("study_ids", [])])
     studies_b = with_linked_registry(session, asset_b, [session.get(ClinicalStudy, i) for i in (mb or {}).get("study_ids", [])])
-    scale = mdef.rows[0] if mdef.rows else None
+    scale = rows[0] if rows else None
     conf = compare_designs(asset_label(asset_a), asset_label(asset_b), [s for s in studies_a if s], [s for s in studies_b if s], scale)
-    card = objection_card(session, indication, asset_a, asset_b, mdef, ma, mb, diff, conf, [s for s in studies_a if s], ev_a, claim_tier) if q == "TR" else None
+    card = objection_card(session, indication, asset_a, asset_b, mdef, ma, mb, diff, conf, [s for s in studies_a if s], ev_a, claim_tier) if q == "TR" and mdef else None
     return {
-        "mvd": {"key": mvd_key, "name": mdef.name, "category": mdef.category, "kind": mdef.kind},
+        "mvd": {"key": mvd_key, "name": driver.attribute_name if driver else (mdef.name if mdef else mvd_key),
+                "category": driver.category if driver else (mdef.category if mdef else "OTHER"), "kind": mdef.kind if mdef else "unmeasured"},
         "asset_a": asset_label(asset_a), "asset_b": asset_label(asset_b), "x": x, "y": round(y, 1), "quadrant": q, "quadrant_label": QUADRANTS[q],
         "claim_tier": claim_tier, "differentiation": diff, "a": _metric_public(ma), "b": _metric_public(mb),
         "evidence_a": ev_a, "evidence_b": ev_b, "regulatory_diff": regulatory_diff(asset_a, pa, asset_b, pb),

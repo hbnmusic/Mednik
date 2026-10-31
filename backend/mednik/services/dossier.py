@@ -119,12 +119,13 @@ def build_dossier(session: Session, indication: Indication, asset_a: Asset, comp
         refs |= set(ids)
         L.append(f"| {i} | {d.attribute_name} | {d.category} | {sd['effective_score']:.2f} | {sd['method']} ({sd['score_source']}) | {', '.join(_cite(x) for x in ids) or '—'} |")
     L.append("")
-    if drivers and all(d.method == "evidence_floor" for d in drivers) and not overrides:
-        L += ["> **No preference or guideline evidence was found for this indication, so every driver sits at the 0.10 floor and the "
-              "ranking and the impact axis below carry no information.** Re-run the sync (it now searches the condition by its standard names) "
-              "or set driver weights manually in the dashboard.", ""]
-    elif drivers and sum(1 for d in drivers if d.method == "evidence_floor") >= len(drivers) / 2:
-        L += [f"> {sum(1 for d in drivers if d.method == 'evidence_floor')} of {len(drivers)} drivers have no preference or guideline evidence and sit at the 0.10 floor.", ""]
+    if not drivers:
+        L += ["> **No guideline or preference source named a treatment-selection consideration for this indication, so no value drivers "
+              "could be derived and the matrix below is empty.** Re-run the sync with an LLM key, or add a guideline PDF in the dashboard.", ""]
+    else:
+        unm = [d for d in drivers if not serialize_driver(d)["measure_key"]]
+        L += ["_Drivers were discovered from guidelines (65% of the weight) and preference studies (35%), not from a preset list. "
+              + (f"{len(unm)} of {len(drivers)} have no matching trial, label or safety measure and appear under “Insufficient evidence”." if unm else "") + "_", ""]
 
     # --- Module 2 ---------------------------------------------------------------------
     L += ["## 2. Competitive Differentiation & Impact Matrix", ""]

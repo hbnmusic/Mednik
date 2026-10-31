@@ -17,6 +17,7 @@ const QUAD_HELP: Record<string, string> = {
   BL: "Low differentiation on low-impact drivers.",
 };
 
+const clip = (t: string) => (t.length > 26 ? `${t.slice(0, 25)}…` : t);
 const SHORT: Record<string, string> = {
   positive_symptoms: "Positive sx", negative_symptoms: "Negative sx", depressive_symptoms: "Depressive sx", manic_symptoms: "Manic sx",
   anxiety_symptoms: "Anxiety", rapid_onset: "Onset", relapse_prevention: "Relapse", psychosocial_functioning: "Function", cognition: "Cognition",
@@ -47,7 +48,7 @@ export function MatrixTab({ data, onOpen, loading }: { data: MatrixResponse | nu
           value: [n.x, n.y], node: n,
           symbol: n.tier === "1A" || n.tier === "1B" ? "circle" : "emptyCircle",
           itemStyle: { opacity: n.uncertain ? 0.5 : 1, ...(n.tier === "1A" || n.tier === "1B" ? {} : { borderColor: color, borderWidth: 2, color: surface }) },
-          label: { show: n.y >= yt || Math.abs(n.x ?? 0) >= 40, formatter: SHORT[n.mvd_key] || n.mvd_name, position: "right", color: ink2, fontSize: 11, fontFamily: "IBM Plex Sans Condensed" },
+          label: { show: n.y >= yt || Math.abs(n.x ?? 0) >= 40, formatter: SHORT[n.mvd_key] || clip(n.mvd_name), position: "right", color: ink2, fontSize: 11, fontFamily: "IBM Plex Sans Condensed" },
         })),
         labelLayout: { hideOverlap: true },
       };
@@ -62,7 +63,7 @@ export function MatrixTab({ data, onOpen, loading }: { data: MatrixResponse | nu
       emphasis: { scale: 1.3 },
       data: insufficient.map((n, i) => ({
         value: [-96 + (i % 3) * 3, n.y], node: n, symbol: "diamond",
-        label: { show: n.y >= yt, formatter: SHORT[n.mvd_key] || n.mvd_name, position: "right", color: ink3, fontSize: 11, fontFamily: "IBM Plex Sans Condensed" },
+        label: { show: n.y >= yt, formatter: SHORT[n.mvd_key] || clip(n.mvd_name), position: "right", color: ink3, fontSize: 11, fontFamily: "IBM Plex Sans Condensed" },
       })) as never,
       labelLayout: { hideOverlap: true },
     } as never);

@@ -193,18 +193,12 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
                 summary["assets"].setdefault(terms[0], {})["literature"] = {"documents": n_docs, "extracted_docs": len(payload), "endpoints": n_ep}
                 say(f"  {terms[0]}: {n_docs} publications stored; {n_ep} citation-validated endpoints from {len(payload)} documents")
 
-        # ---- 4. MVD blueprint ----------------------------------------------------------
+        # ---- 4. guidelines, then the driver blueprint ---------------------------------------
         if request.get("include_mvd", True):
             with session_scope() as s:
                 ind_o = s.get(Indication, ind_id)
                 await ingest_mvd_literature(s, ind_o, max_pubmed=80, max_epmc=80, force_refresh=force, say=say)
-            with session_scope() as s:
-                ind_o = s.get(Indication, ind_id)
-                drivers = await compute_mvds(s, ind_o, say=say, max_docs=request.get("max_mvd_docs"))
-                summary["mvd"] = {d.attribute_key: d.mvd_impact_score for d in drivers}
-                say("MVD blueprint: " + ", ".join(f"{d.attribute_key}={d.mvd_impact_score:.2f}" for d in sorted(drivers, key=lambda d: -d.mvd_impact_score)[:6]) + " …")
 
-        # ---- 5. guidelines -----------------------------------------------------------------
         if request.get("include_guidelines", True):
             with session_scope() as s:
                 ind_o = s.get(Indication, ind_id)
@@ -212,6 +206,13 @@ async def run_ingest(job_id: str, request: dict[str, Any]) -> dict[str, Any]:
                 g = await ingest_guidelines(s, ind_o, assets_o, max_docs=request.get("max_guideline_docs"), force_refresh=force, say=say)
                 summary["guidelines"] = g
                 say(f"Guidelines: {g['recommendations']} positioning statements extracted from {g['documents_mentioning_assets']} documents")
+
+        # drivers are discovered after guidelines are fetched, because guidelines are their primary source
+        if request.get("include_mvd", True):
+            with session_scope() as s:
+                ind_o = s.get(Indication, ind_id)
+                drivers = await compute_mvds(s, ind_o, say=say, max_docs=request.get("max_mvd_docs"))
+                summary["mvd"] = {d.attribute_key: d.mvd_impact_score for d in drivers}
 
         summary["llm_usage"] = llm_base.usage_snapshot()
         u = summary["llm_usage"]

@@ -14,12 +14,15 @@ export const DOMAIN: Record<Driver["category"], { label: string; color: string }
   SAFETY_TOLERABILITY: { label: "Safety & tolerability", color: "var(--series-2)" },
   FUNCTION_QOL: { label: "Function & QoL", color: "var(--series-3)" },
   EXECUTION_DOSING: { label: "Execution & dosing", color: "var(--series-4)" },
+  OTHER: { label: "Other (access, patient, comorbidity)", color: "var(--ink-3)" },
 };
 const METHOD: Record<string, string> = {
-  llm_preference_extraction: "DCE / survey extraction",
-  lexical_fallback: "Lexical extraction (no LLM key)",
-  guideline_only: "Guideline mentions only",
-  evidence_floor: "No preference evidence found (floor)",
+  "llm_guideline+preference": "Named by guidelines and preference studies",
+  llm_guideline: "Named by guidelines",
+  llm_preference: "Named by preference studies only",
+  "lexical_guideline+preference": "Keyword match in guidelines and preference studies (no LLM key)",
+  lexical_guideline: "Keyword match in guidelines (no LLM key)",
+  lexical_preference: "Keyword match in preference studies (no LLM key)",
 };
 
 function DriverRow({ d, rank, value, onChange, onCommit }: { d: Driver; rank: number; value: number; onChange: (v: number) => void; onCommit: (v: number) => void }) {
@@ -52,7 +55,8 @@ function DriverRow({ d, rank, value, onChange, onCommit }: { d: Driver; rank: nu
             <p className="text-xs text-ink-2">
               {METHOD[d.method] || d.method}. Evidence score {fmt(d.evidence_score, 2)}
               {d.components?.preference_norm != null && <>; preference index {fmt(d.components.preference_norm as number, 2)} of max from {d.components.n_pref_studies} stud{d.components.n_pref_studies === 1 ? "y" : "ies"}</>}
-              {d.components?.guideline_share != null && <>; cited in {fmt((d.components.guideline_share as number) * 100, 0)}% of {d.components.n_guideline_docs} guideline documents</>}.
+              {d.components?.n_guideline_citing != null && Number(d.components.n_guideline_citing) > 0 && <>; cited in {d.components.n_guideline_citing} of {d.components.n_guideline_docs} guideline documents</>}
+              {d.measure_name ? <>. Compared in the matrix using “{d.measure_name}”</> : <>. No trial, label or safety measure corresponds to this driver, so it is not scored in the matrix</>}.
             </p>
             {d.verbatim_evidence.length > 0 ? <div className="mt-2"><QuoteList quotes={d.verbatim_evidence} max={5} /></div>
               : <p className="mt-1 text-xs text-ink-3">No preference study or guideline sentence names this driver. Treat the weight as an assumption; adjust it with the slider.</p>}
@@ -68,7 +72,8 @@ export function MvdTab({ data, guidelines, overrides, setOverride, resetOverride
   setOverride: (k: string, v: number) => void; resetOverrides: () => void; saveOverrides: () => void; saving: boolean; loading: boolean;
 }) {
   const [draft, setDraft] = useState<Record<string, number>>({});
-  if (!data) return loading ? <Empty title="Loading value drivers…" /> : <Empty title="No value drivers for this indication yet">Run “Sync live data” to build the driver blueprint from preference studies and guidelines.</Empty>;
+  if (!data) return loading ? <Empty title="Loading value drivers…" /> : <Empty title="No value drivers for this indication yet">Run “Sync live data”. Drivers are discovered from guidelines and preference studies; none are preset.</Empty>;
+  if (data.drivers.length === 0) return <Empty title="No source named a treatment-selection consideration">No guideline or preference study found for this indication stated what should drive treatment choice, so no drivers were created. Re-run the sync with an LLM key, or add a guideline PDF.</Empty>;
   const val = (d: Driver) => draft[d.key] ?? overrides[d.key] ?? d.effective_score;
   const drivers = [...data.drivers].sort((a, b) => val(b) - val(a));
   const nOver = Object.keys(overrides).length;
@@ -86,12 +91,6 @@ export function MvdTab({ data, guidelines, overrides, setOverride, resetOverride
             <Button size="sm" onClick={saveOverrides} disabled={!nOver || saving}>{saving ? "Saving…" : "Save weights"}</Button>
           </div>
         </div>
-        {data.drivers.length > 0 && data.drivers.every((d) => d.method === "evidence_floor") && nOver === 0 && (
-          <p className="border-b border-line bg-accent-wash px-4 py-2.5 text-xs text-ink">
-            No preference studies or guidelines were found for this indication, so every driver sits at the 0.10 floor and this ranking carries no
-            information. Run “Sync live data” again, or drag the sliders to set your own weights (they flow through to the matrix).
-          </p>
-        )}
         <ul>
           {drivers.map((d, i) => (
             <DriverRow key={d.key} d={d} rank={i + 1} value={val(d)}

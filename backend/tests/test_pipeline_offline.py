@@ -128,17 +128,18 @@ def test_full_pipeline_offline(client):
 
     # Module 1
     mvd = client.get("/api/v1/mvd", params={"indication": "Schizophrenia"}).json()
-    top = mvd["drivers"][0]
-    assert top["key"] == "positive_symptoms" and top["effective_score"] == 1.0
-    assert any(d["key"] == "cognition" and d["method"] == "evidence_floor" for d in mvd["drivers"])
+    keys = {d["key"] for d in mvd["drivers"]}
+    assert mvd["drivers"][0]["key"] == "weight_metabolic" and mvd["drivers"][0]["effective_score"] == 1.0  # cited by the guideline (65% weight)
+    assert "cognition" not in keys and "no_titration" not in keys  # no source names them, so they are not invented
+    assert all(d["evidence_count"] > 0 and d["verbatim_evidence"] and d["method"] != "evidence_floor" for d in mvd["drivers"])
+    assert min(d["effective_score"] for d in mvd["drivers"]) > 0.10  # nothing parked at a placeholder floor
 
     # Module 2
     mx = client.get("/api/v1/matrix", params={"indication": "Schizophrenia", "asset_a": "alphazine", "comparators": "betapride"}).json()
     nodes = {n["mvd_key"]: n for n in mx["nodes"]}
+    assert set(nodes) == keys  # one node per discovered driver
     assert nodes["positive_symptoms"]["x"] is not None and nodes["positive_symptoms"]["x"] > 0
-    assert nodes["no_titration"]["x"] > 0 and nodes["no_titration"]["tier"] == "1A"
     assert nodes["akathisia_eps"]["x"] > 0  # alphazine lower excess akathisia
-    assert nodes["cognition"]["insufficient"] and nodes["cognition"]["quadrant"] in ("TL", "BL")
     det = client.get("/api/v1/matrix/node", params={"indication": "Schizophrenia", "asset_a": "alphazine", "asset_b": "betapride",
                                                     "mvd_key": "positive_symptoms"}).json()
     assert det["confounder_alert"]["alert"]  # baseline PANSS 94.5 vs 82.5 → >10 %

@@ -58,6 +58,7 @@ class Settings(BaseSettings):
     # Per-sync caps on documents sent to the LLM (each document is one call, or a share of one for short abstracts).
     llm_max_asset_docs: int = 25  # per asset, literature extraction (was 40)
     llm_max_mvd_docs: int = 20  # preference studies for the value-driver blueprint (was 40)
+    llm_max_driver_guideline_docs: int = 12  # guidelines read for market value drivers (the primary source)
     llm_max_guideline_docs: int = 8  # most recent guideline / consensus documents (was 12)
     gemini_thinking_level: str = "low"  # Gemini 3.x reasoning effort for extraction ("" = model default)
     gemini_api_key: str | None = Field(

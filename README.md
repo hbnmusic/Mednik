@@ -2,7 +2,7 @@
 
 Medical Affairs strategic intelligence engine. mednik pulls live regulatory, registry and literature data, stratifies it deterministically, and turns it into three working views for evidence generation, competitive differentiation and scientific communication strategy:
 
-1. **Value drivers** — a product-agnostic, ranked blueprint of what prescribers weigh in an indication (from discrete-choice / conjoint / survey studies and guidelines), with persona toggles and weight sliders, plus each asset's guideline position and the evidence gaps blocking a higher tier.
+1. **Value drivers** — a product-agnostic, ranked blueprint of what prescribers weigh in an indication (discovered from guidelines first, then discrete-choice / conjoint / survey studies), with persona toggles and weight sliders, plus each asset's guideline position and the evidence gaps blocking a higher tier.
 2. **Differentiation matrix** — Product A vs up to three comparators on every driver: X = tier-weighted magnitude of differentiation, Y = HCP decision impact. Each node opens the USPI regulatory diff, a cross-trial confounder alert and (for platform pillars) an MSL objection-handler card.
 3. **Evidence map** — endpoint × indication × timepoint heatmap with effect-size colour, L1–L5 validity badges and hatched white space. Gap cells draft a Phase 4 / RWE / IIS study concept from how competitors designed their trials.
 
@@ -104,7 +104,7 @@ For an indirect comparison the claim tier is the weaker of the two sides' best t
 
 **Differentiation (X)**: effect drivers `100·tanh(Δd/0.25)`; risk drivers `100·tanh(ΔRD/5 pp)`; label-structural drivers `100·ΔS/3` (S = 0–3 label score: titration, CYP3A4/2D6 handling, dosing convenience, boxed warning / contraindications); onset `100·tanh(Δweeks/1.5)`.
 
-**Impact (Y)**: driver score × 100, where score = 0.10 + 0.90 × (0.75 · preference index + 0.25 · guideline mention share) / max. Drivers with no preference or guideline evidence sit at the 0.10 floor and are labelled. Persona multipliers and slider overrides are explicit user adjustments and never overwrite the evidence score.
+**Impact (Y)**: driver score × 100. The drivers themselves are discovered, not preset: considerations are extracted (with verbatim quotes) from guidelines and preference studies, and an LLM groups differently worded labels into drivers. score = 0.10 + 0.90 × raw / max(raw), where raw = 0.65 · guideline share + 0.35 · preference index (each scaled by its maximum; a single source type is used alone). A driver that no source names does not exist. Drivers with no matching trial, label or safety measure are listed as unmeasured (they appear in the left evidence-gap lane). Without an LLM key, drivers are limited to keyword matches. Persona multipliers and slider overrides are explicit user adjustments and never overwrite the evidence score.
 
 **Validity (L1–L5)**: L5 USPI §14 / replicated positive Phase 3 primary · L4 single Phase 3 primary, controlled key secondary, large Phase 4 RCT · L3 Phase 3 nominal secondary / post-hoc, MA, RWE N>500 · L2 Phase 2 RCT, academic N 50–500 · L1 small IIS, case series, biomarker.
 

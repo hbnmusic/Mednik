@@ -438,3 +438,150 @@ def lexical_guideline_recs(docs: list[tuple[str, str]], asset_terms_by_asset: di
                                 "role": "ADJUNCTIVE" if re.search(r"adjunct", s, re.I) else "UNSPECIFIED",
                                 "level_of_evidence": None, "verbatim_quote": s, "source_id": sid, "_lexical": True})
     return validate_items(out, dict(docs), numeric_fields=(), schema_name="guideline_lexical", provider="lexical")
+
+
+# ---------------------------------------------------------------------------
+# Market value drivers discovered from the literature
+# ---------------------------------------------------------------------------
+
+DRIVER_CATEGORIES = ["EFFICACY", "FUNCTION_QOL", "SAFETY_TOLERABILITY", "EXECUTION_DOSING", "OTHER"]
+_IMPORTANCE_METRICS = ["RELATIVE_IMPORTANCE_PCT", "COEFFICIENT", "RANK", "PERCENT_RATING_IMPORTANT", "WILLINGNESS_TO_TRADE",
+                       "STRONG_EMPHASIS", "QUALITATIVE_HIGH", "QUALITATIVE_MENTION"]
+
+
+def driver_candidate_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "study_design": {"type": "string", "enum": ["DCE", "CONJOINT", "BEST_WORST", "SURVEY", "GUIDELINE", "REVIEW", "OTHER"]},
+            "respondent_type": STR,
+            "n_respondents": INT,
+            "attributes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "attribute_text": {"type": "string"},
+                        "importance_value": NUM,
+                        "importance_metric": {"type": "string", "enum": _IMPORTANCE_METRICS},
+                        "verbatim_quote": {"type": "string"},
+                        "source_id": {"type": "string"},
+                    },
+                    "required": ["attribute_text", "importance_metric", "verbatim_quote", "source_id"],
+                },
+            },
+        },
+        "required": ["study_design", "attributes"],
+    }
+
+
+async def extract_driver_candidates(docs: list[tuple[str, str, str]], indication_label: str,
+                                    provider: LlmProvider | None = None) -> list[dict[str, Any]]:
+    """What each document says should drive treatment choice, in the document's own words.
+
+    ``docs`` are (source_id, text, kind) with kind 'guideline' or 'preference'. Nothing is mapped onto a fixed list
+    here; every attribute carries a verbatim quote that is checked against the source text."""
+    provider = provider or get_provider()
+    if provider is None or not docs:
+        return []
+    kinds = {sid: kind for sid, _, kind in docs}
+
+    async def one(sid: str, text: str, kind: str) -> list[dict[str, Any]]:
+        if kind == "guideline":
+            ask = ("This is a clinical practice guideline or consensus statement. List the considerations it tells prescribers to weigh when "
+                   "choosing a treatment for this indication: outcomes to achieve, tolerability or safety concerns, patient factors, dosing or "
+                   "administration, monitoring, access. Use a short noun phrase in the document's own wording; do not translate it into a "
+                   "standard vocabulary. importance_metric is STRONG_EMPHASIS when the document explicitly prioritises the consideration "
+                   "(for example it makes a treatment first-line or preferred because of it, or calls it key or most important), otherwise "
+                   "QUALITATIVE_MENTION. Report at most 15 considerations, the ones the document stresses most.")
+        else:
+            ask = ("This is a discrete choice experiment, conjoint, best-worst, survey, or similar preference study. List the treatment "
+                   "attributes that clinicians or patients weighed, in the study's own wording. Report the importance value exactly as given "
+                   "(relative importance %, coefficient, rank, % rating important) with the matching importance_metric, or QUALITATIVE_HIGH / "
+                   "QUALITATIVE_MENTION when no number is reported. At most 15 attributes.")
+        prompt = f"Indication: {indication_label}. {ask}\n\n" + _docs_block([(sid, text)], 40000)
+        out = await _run(provider, prompt, driver_candidate_schema(), "driver_candidates")
+        attrs = out.get("attributes") or []
+        for a in attrs:
+            a["source_id"] = sid
+            a["_study_design"] = out.get("study_design")
+            a["_n_respondents"] = out.get("n_respondents")
+            a["_kind"] = kind
+        ok = validate_items(attrs, {sid: text}, numeric_fields=("importance_value",), schema_name="driver_candidates", provider=provider.name)
+        for a in ok:
+            a["_kind"] = kind
+        return ok
+
+    results: list[dict[str, Any]] = []
+    for part in await asyncio.gather(*(one(sid, text, kind) for sid, text, kind in docs)):
+        results += part
+    seen: set[tuple[str, str]] = set()
+    out: list[dict[str, Any]] = []
+    for r in results:
+        k = (str(r.get("source_id")), normalize_text(r.get("attribute_text", "")))
+        if k not in seen and k[1]:
+            seen.add(k)
+            r["_kind"] = kinds.get(str(r.get("source_id")), r.get("_kind", "preference"))
+            out.append(r)
+    return out
+
+
+def driver_group_schema(measure_keys: list[str]) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "drivers": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string"},
+                        "category": {"type": "string", "enum": DRIVER_CATEGORIES},
+                        "measure_key": {"type": "string", "enum": measure_keys + ["NONE"]},
+                        "member_ids": {"type": "array", "items": {"type": "integer"}},
+                    },
+                    "required": ["name", "category", "measure_key", "member_ids"],
+                },
+            }
+        },
+        "required": ["drivers"],
+    }
+
+
+async def group_driver_candidates(labels: list[tuple[int, str, str]], indication_label: str, measurable: list[tuple[str, str]],
+                                  provider: LlmProvider | None = None) -> list[dict[str, Any]]:
+    """Cluster attribute labels that describe the same consideration, however differently the sources word it.
+
+    ``labels`` are (id, label, kind); ``measurable`` are (key, name) of the measures mednik can compute from trials and
+    labels. Returns [{name, category, measure_key | None, member_ids}]; ids not placed in any cluster are dropped."""
+    provider = provider or get_provider()
+    if provider is None or not labels:
+        return []
+    keys = [k for k, _ in measurable]
+    listing = "\n".join(f"{i} | {kind} | {text}" for i, text, kind in labels)
+    measures = "\n".join(f"- {k}: {n}" for k, n in measurable)
+    prompt = (
+        f"Indication: {indication_label}. Below are attribute labels extracted from guidelines and preference studies, each with an id, the "
+        "kind of source and the label as worded in that source. Group labels that describe the same underlying consideration for choosing a "
+        "treatment, even when worded very differently. Keep considerations that a prescriber weighs separately apart (for example weight gain "
+        "and sedation). Name each group in plain clinical language. Skip labels that are not considerations for choosing a treatment. Each id "
+        "may appear in at most one group.\n"
+        "Set category to the best fit (EFFICACY, FUNCTION_QOL, SAFETY_TOLERABILITY, EXECUTION_DOSING, or OTHER for things such as cost, access, "
+        "patient preference or comorbidity).\n"
+        "Set measure_key to one of the measures below only when the group is that same thing; otherwise NONE.\n"
+        f"Measures:\n{measures}\n\nLabels (id | source kind | label):\n{listing}"
+    )
+    out = await _run(provider, prompt, driver_group_schema(keys), "driver_grouping")
+    valid = {i for i, _, _ in labels}
+    used: set[int] = set()
+    clusters: list[dict[str, Any]] = []
+    for c in out.get("drivers") or []:
+        name = re.sub(r"\s+", " ", str(c.get("name") or "")).strip()[:120]
+        ids = [i for i in c.get("member_ids") or [] if isinstance(i, int) and i in valid and i not in used]
+        if not name or not ids:
+            continue
+        used.update(ids)
+        mk = c.get("measure_key")
+        clusters.append({"name": name, "category": c.get("category") if c.get("category") in DRIVER_CATEGORIES else "OTHER",
+                         "measure_key": mk if mk in keys else None, "member_ids": ids})
+    return clusters

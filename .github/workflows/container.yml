@@ -90,8 +90,8 @@ jobs:
           python3 - <<'PY'
           import json
           d = json.load(open("mvd.json"))["drivers"]
-          real = [x for x in d if x["method"] != "evidence_floor"]
-          print(f"::notice title=MVD::{len(real)} of {len(d)} drivers have evidence; scores " + ", ".join(f"{x['key']}={x['effective_score']:.2f}" for x in sorted(d, key=lambda x: -x["effective_score"])[:8]))
+          real = [x for x in d if x["evidence_count"] > 0 and x["verbatim_evidence"]]
+          print(f"::notice title=MVD::{len(real)} drivers discovered; " + ", ".join(f"{x['name']}={x['effective_score']:.2f}" for x in d[:10]))
           open("mvd_real.txt", "w").write(str(len(real)))
           PY
           oom=$(docker inspect mednik --format '{{.State.OOMKilled}} restarts={{.RestartCount}}')
