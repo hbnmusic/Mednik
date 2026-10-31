@@ -19,7 +19,7 @@ export function url(path: string, params?: Params): string {
 }
 
 // Hosted deployments use a password sign-in; an expired session sends the browser back to /login.
-function toLogin(r: Response): void {
+export function toLogin(r: Response): void {
   if (r.status === 401 && typeof window !== "undefined") {
     // /login is served by the API, not by Next.js, so this must be a full page load.
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination

@@ -64,7 +64,7 @@ jobs:
         run: |
           jar=$(mktemp)
           curl -fs -c "$jar" -o /dev/null -d 'password=ci-password&next=/' localhost:10000/login
-          body='{"indication":"Major Depressive Disorder (adjunct)","assets":[{"generic":"lumateperone","brand":"Caplyta"},{"generic":"cariprazine","brand":"Vraylar"},{"generic":"quetiapine","brand":"Seroquel"},{"generic":"bupropion","brand":"Wellbutrin"},{"generic":"aripiprazole","brand":"Abilify"},{"generic":"brexpiprazole","brand":"Rexulti"}]}'
+          body='{"indication":"adjunct Major Depressive Disorder","assets":[{"generic":"lumateperone","brand":"Caplyta"},{"generic":"cariprazine","brand":"Vraylar"},{"generic":"quetiapine","brand":"Seroquel"},{"generic":"bupropion","brand":"Wellbutrin"},{"generic":"aripiprazole","brand":"Abilify"},{"generic":"brexpiprazole","brand":"Rexulti"}]}'
           job=$(curl -fs -b "$jar" -H 'Content-Type: application/json' -d "$body" localhost:10000/api/v1/ingest | python3 -c 'import json,sys; print(json.load(sys.stdin)["job_id"])')
           echo "job $job"
           status=running
@@ -86,11 +86,20 @@ jobs:
           print(f"::notice title=sync result::status={j['status']} trials={trials} error={j['error']}")
           open("trials.txt", "w").write(str(trials))
           PY
+          curl -fs -b "$jar" "localhost:10000/api/v1/mvd?indication=mdd" > mvd.json || echo '{"drivers":[]}' > mvd.json
+          python3 - <<'PY'
+          import json
+          d = json.load(open("mvd.json"))["drivers"]
+          real = [x for x in d if x["method"] != "evidence_floor"]
+          print(f"::notice title=MVD::{len(real)} of {len(d)} drivers have evidence; scores " + ", ".join(f"{x['key']}={x['effective_score']:.2f}" for x in sorted(d, key=lambda x: -x["effective_score"])[:8]))
+          open("mvd_real.txt", "w").write(str(len(real)))
+          PY
           oom=$(docker inspect mednik --format '{{.State.OOMKilled}} restarts={{.RestartCount}}')
           echo "OOMKilled: $oom" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "Sync status: $status" | tee -a "$GITHUB_STEP_SUMMARY"
           test "$status" = done
           test "$(cat trials.txt)" -ge 20
+          test "$(cat mvd_real.txt)" -ge 3
           case "$oom" in false*) ;; *) exit 1;; esac
 
       - name: Container log

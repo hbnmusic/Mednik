@@ -175,6 +175,15 @@ def test_full_pipeline_offline(client):
     assert md.status_code == 200 and "Medical Strategy Briefing" in md.text and "NCT00000011" in md.text
     pdf = client.get("/api/v1/export/dossier", params={"indication": "Schizophrenia", "asset_a": "alphazine", "comparators": "betapride", "format": "pdf"})
     assert pdf.content[:5] == b"%PDF-"
+    assert "data:image/svg+xml;base64," in md.text  # quadrant map is part of the briefing
+    import os
+
+    import pymupdf
+
+    doc = pymupdf.open("pdf", pdf.content)
+    assert any(p.get_images() for p in doc)  # ...and survives into the PDF
+    if os.environ.get("MEDNIK_TEST_PDF_OUT"):
+        open(os.environ["MEDNIK_TEST_PDF_OUT"], "wb").write(pdf.content)
 
     audit = client.get("/api/v1/audit").json()
     assert audit["accepted"] > 0

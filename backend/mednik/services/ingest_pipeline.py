@@ -49,9 +49,11 @@ def ensure_indication(session: Session, name: str) -> Indication:
         ind = session.execute(select(Indication).where(Indication.name == name)).scalar_one_or_none()
     if ind is None:
         d = INDICATION_BY_KEY.get(key)
-        ind = Indication(name=name.strip(), key=key, icd10_code=d.icd10 if d else None)
+        ind = Indication(name=d.label if d else name.strip(), key=key, icd10_code=d.icd10 if d else None)
         session.add(ind)
         session.flush()
+    elif key in INDICATION_BY_KEY and ind.name != INDICATION_BY_KEY[key].label:
+        ind.name = INDICATION_BY_KEY[key].label  # setting words typed by the user ("adjunct ...") live in the heatmap columns, not the name
     return ind
 
 

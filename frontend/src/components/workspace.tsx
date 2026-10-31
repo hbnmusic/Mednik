@@ -9,6 +9,7 @@ import {
   type AssetRow, type GuidelinesResponse, type HeatCell, type HeatColumn, type HeatmapResponse, type Health, type IndicationRow, type Job,
   type MatrixNode, type MatrixResponse, type MvdResponse,
 } from "@/lib/api";
+import { toLogin } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 
@@ -177,6 +178,33 @@ export function Workspace() {
 
   const indName = indications.find((i) => i.key === indication)?.name || indication;
   const exportUrl = (format: string) => url("/api/v1/export/dossier", { indication, asset_a: assetA, comparators: comparators.join(","), format, persona, tier_filter: tier, overrides: overridesParam });
+  const [exporting, setExporting] = useState(false);
+  // One request, saved from memory: opening the API URL in a new tab let the browser re-fetch the file each time the
+  // (slow to render) response was retried, and gave no feedback while the PDF was being built.
+  async function exportDossier(format: "pdf" | "md") {
+    if (exporting) return;
+    setExporting(true);
+    setError(null);
+    try {
+      const r = await fetch(exportUrl(format), { credentials: "same-origin" });
+      toLogin(r);
+      if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 160)}`);
+      const blob = await r.blob();
+      const name = /filename="([^"]+)"/.exec(r.headers.get("Content-Disposition") ?? "")?.[1] ?? `mednik-dossier.${format}`;
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 30_000);
+    } catch (e) {
+      setError(`Couldn't export the dossier: ${(e as Error).message}`);
+    } finally {
+      setExporting(false);
+    }
+  }
   const lastLog = job?.log[job.log.length - 1]?.msg;
   const noData = !apiDown && health && health.counts.assets === 0;
 
@@ -194,9 +222,9 @@ export function Workspace() {
         <div className="ml-auto flex items-center gap-2">
           <Button variant="primary" onClick={() => setSyncOpen(true)}><RefreshCw className={cn("h-3.5 w-3.5", job?.status === "running" && "animate-spin")} aria-hidden />Sync live data</Button>
           <Button onClick={() => setPdfOpen(true)}><FileUp className="h-3.5 w-3.5" aria-hidden />Add PDF</Button>
-          <Menu trigger={<Button disabled={!matrix}><Download className="h-3.5 w-3.5" aria-hidden />Export</Button>} items={[
-            { label: "Briefing dossier (PDF)", hint: "Current selection, fully cited", onSelect: () => window.open(exportUrl("pdf"), "_blank") },
-            { label: "Briefing dossier (Markdown)", onSelect: () => window.open(exportUrl("md"), "_blank") },
+          <Menu trigger={<Button disabled={!matrix || exporting}><Download className="h-3.5 w-3.5" aria-hidden />{exporting ? "Preparing…" : "Export"}</Button>} items={[
+            { label: "Briefing dossier (PDF)", hint: "Current selection, fully cited", onSelect: () => void exportDossier("pdf") },
+            { label: "Briefing dossier (Markdown)", onSelect: () => void exportDossier("md") },
           ]} />
           <Button size="icon" variant="quiet" aria-label="Toggle light and dark theme" onClick={toggleTheme}>
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

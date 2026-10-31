@@ -35,6 +35,7 @@ from ..textutil import split_sentences
 from .extraction import extract_mvd_preferences
 from .llm.base import get_provider
 from .literature_ingest import doc_text, search_corpus, store_corpus
+from .query_terms import epmc_condition, pubmed_condition
 
 log = logging.getLogger("mednik.mvd")
 
@@ -43,13 +44,13 @@ _GUIDE_CONSIDER_RE = re.compile(r"consider|select|choice|choos|priorit|important
 
 
 def mvd_pubmed_term(indication_name: str) -> str:
-    return (f'("{indication_name}"[tiab] OR "{indication_name}"[mh]) AND ("discrete choice experiment"[tiab] OR "discrete choice"[tiab] '
+    return (f'{pubmed_condition(indication_name)} AND ("discrete choice experiment"[tiab] OR "discrete choice"[tiab] '
             f'OR "conjoint analysis"[tiab] OR "best-worst"[tiab] OR "treatment preference"[tiab] OR "treatment preferences"[tiab] '
             f'OR "prescriber survey"[tiab] OR "psychiatrist survey"[tiab] OR "clinical practice guideline"[tiab] OR "Practice Guideline"[pt])')
 
 
 def mvd_epmc_query(indication_name: str) -> str:
-    return (f'"{indication_name}" AND ("discrete choice experiment" OR "conjoint analysis" OR "treatment preference" '
+    return (f'{epmc_condition(indication_name)} AND ("discrete choice experiment" OR "conjoint analysis" OR "treatment preference" '
             f'OR "prescriber survey" OR "clinical practice guideline")')
 
 

@@ -86,6 +86,12 @@ export function MvdTab({ data, guidelines, overrides, setOverride, resetOverride
             <Button size="sm" onClick={saveOverrides} disabled={!nOver || saving}>{saving ? "Saving…" : "Save weights"}</Button>
           </div>
         </div>
+        {data.drivers.length > 0 && data.drivers.every((d) => d.method === "evidence_floor") && nOver === 0 && (
+          <p className="border-b border-line bg-accent-wash px-4 py-2.5 text-xs text-ink">
+            No preference studies or guidelines were found for this indication, so every driver sits at the 0.10 floor and this ranking carries no
+            information. Run “Sync live data” again, or drag the sliders to set your own weights (they flow through to the matrix).
+          </p>
+        )}
         <ul>
           {drivers.map((d, i) => (
             <DriverRow key={d.key} d={d} rank={i + 1} value={val(d)}

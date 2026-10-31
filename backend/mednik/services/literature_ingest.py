@@ -15,6 +15,7 @@ from ..models import ClinicalStudy, Document, DocumentLink, ExtractedEndpoint
 from ..taxonomy import SCALE_BY_KEY, classify_indication, classify_scale, text_mentions_asset
 from ..textutil import clean_ws, parse_p_value, sha256_text
 from . import stats
+from .query_terms import epmc_condition, pubmed_condition
 from .tiering import EvidenceContext, evidence_tier, validity_level
 from .trials_ingest import column_for
 
@@ -224,12 +225,12 @@ def store_corpus(session: Session, corpus: list[tuple[str, dict[str, Any]]], rol
 
 def pubmed_asset_term(asset_terms: list[str], indication_name: str | None) -> str:
     a = " OR ".join(f'"{t}"[tiab]' for t in asset_terms)
-    return f"({a})" + (f' AND ("{indication_name}"[tiab] OR "{indication_name}"[mh])' if indication_name else "")
+    return f"({a})" + (f" AND {pubmed_condition(indication_name)}" if indication_name else "")
 
 
 def epmc_asset_query(asset_terms: list[str], indication_name: str | None) -> str:
     a = " OR ".join(f'"{t}"' for t in asset_terms)
-    return f"({a})" + (f' AND "{indication_name}"' if indication_name else "")
+    return f"({a})" + (f" AND {epmc_condition(indication_name)}" if indication_name else "")
 
 
 def doc_sponsor_class(doc: Document, company: str | None, trial_sponsors: dict[str, str]) -> str:

@@ -29,6 +29,7 @@ from ..taxonomy import INDICATION_BY_KEY, asset_terms, column_label, text_mentio
 from ..textutil import clean_ws
 from .extraction import extract_guideline_recs
 from .literature_ingest import doc_text, search_corpus, store_corpus
+from .query_terms import epmc_condition, pubmed_condition
 
 log = logging.getLogger("mednik.guidelines")
 
@@ -52,12 +53,12 @@ DEFAULT_RULES: list[dict[str, Any]] = [
 
 
 def guideline_pubmed_term(indication_name: str) -> str:
-    return (f'("{indication_name}"[tiab] OR "{indication_name}"[mh]) AND ("Practice Guideline"[pt] OR "Guideline"[pt] OR guideline*[ti] '
+    return (f'{pubmed_condition(indication_name)} AND ("Practice Guideline"[pt] OR "Guideline"[pt] OR guideline*[ti] '
             f'OR CANMAT[tiab] OR WFSBP[tiab] OR consensus[ti] OR "treatment algorithm"[ti] OR recommendations[ti]) AND 2012:3000[dp]')
 
 
 def guideline_epmc_query(indication_name: str) -> str:
-    return f'"{indication_name}" AND (TITLE:"guideline" OR TITLE:"guidelines" OR TITLE:"consensus" OR CANMAT OR WFSBP) AND PUB_YEAR:[2012 TO 2030]'
+    return f'{epmc_condition(indication_name)} AND (TITLE:"guideline" OR TITLE:"guidelines" OR TITLE:"consensus" OR CANMAT OR WFSBP) AND PUB_YEAR:[2012 TO 2030]'
 
 
 def jats_to_text(xml: str) -> str:
